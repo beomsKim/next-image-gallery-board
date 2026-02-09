@@ -127,8 +127,8 @@ export default function MyPage() {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`px-6 py-3 rounded-lg transition-colors ${activeTab === tab.id
-                                    ? 'bg-primary-600 text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-100'
                                 }`}
                         >
                             {tab.label} ({tab.count})
