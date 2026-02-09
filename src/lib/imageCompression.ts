@@ -51,8 +51,8 @@ export const validateImage = (file: File): { valid: boolean; error?: string } =>
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!validTypes.includes(file.type)) {
         return {
-        valid: false,
-        error: '지원하지 않는 이미지 형식입니다. (JPG, PNG, WebP만 가능)',
+            valid: false,
+            error: '지원하지 않는 이미지 형식입니다. (JPG, PNG, WebP만 가능)',
         };
     }
 
@@ -60,8 +60,8 @@ export const validateImage = (file: File): { valid: boolean; error?: string } =>
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
         return {
-        valid: false,
-        error: '이미지 크기는 5MB 이하여야 합니다.',
+            valid: false,
+            error: '이미지 크기는 5MB 이하여야 합니다.',
         };
     }
 

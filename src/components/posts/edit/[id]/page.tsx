@@ -48,7 +48,7 @@ export default function EditPostPage({ params }: { params: { id: string } }) {
         } catch (error) {
             console.error('게시글 로드 실패:', error);
             alert('게시글을 불러오는데 실패했습니다.');
-        router.push('/');
+            router.push('/');
         } finally {
             setLoading(false);
         }

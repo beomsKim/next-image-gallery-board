@@ -21,7 +21,7 @@ export const useImageUpload = () => {
     // 이미지 추가
     const addImages = async (files: FileList | File[]) => {
         const fileArray = Array.from(files);
-        
+
         // 개수 제한 (5개)
         if (images.length + fileArray.length > 5) {
             throw new Error('이미지는 최대 5장까지 업로드할 수 있습니다.');
@@ -111,7 +111,7 @@ export const useImageUpload = () => {
             });
 
             const results = await Promise.all(uploadPromises);
-            
+
             setUploading(false);
             setUploadProgress(100);
 
@@ -131,12 +131,12 @@ export const useImageUpload = () => {
             const deletePromises = imageUrls.map(async (url) => {
                 const imageRef = ref(storage, url);
                 await deleteObject(imageRef);
-                
+
                 // 썸네일도 삭제
                 const thumbnailUrl = url.replace('/original/', '/thumbnails/').replace('.webp', '_thumb.webp');
                 const thumbnailRef = ref(storage, thumbnailUrl);
                 await deleteObject(thumbnailRef).catch(() => {
-                // 썸네일이 없을 수도 있으므로 에러 무시
+                    // 썸네일이 없을 수도 있으므로 에러 무시
                 });
             });
 

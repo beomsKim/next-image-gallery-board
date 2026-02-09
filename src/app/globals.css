@@ -7,15 +7,15 @@
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
   }
-  
+
   h1 {
     @apply text-3xl font-bold;
   }
-  
+
   h2 {
     @apply text-2xl font-semibold;
   }
-  
+
   h3 {
     @apply text-xl font-semibold;
   }
@@ -26,15 +26,15 @@
   .btn-primary {
     @apply bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed;
   }
-  
+
   .btn-secondary {
     @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed;
   }
-  
+
   .input-field {
     @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
   }
-  
+
   .card {
     @apply bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow;
   }
@@ -46,7 +46,7 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  
+
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
@@ -69,6 +69,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

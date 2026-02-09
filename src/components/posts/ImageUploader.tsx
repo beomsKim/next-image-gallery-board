@@ -46,7 +46,7 @@ function SortableImage({ image, onRemove }: { image: UploadedImage; onRemove: ()
                 fill
                 className="object-cover"
             />
-        
+
             {/* 드래그 핸들 */}
             <div
                 {...attributes}
@@ -55,7 +55,7 @@ function SortableImage({ image, onRemove }: { image: UploadedImage; onRemove: ()
             >
                 <MdDragIndicator size={20} />
             </div>
-            
+
             {/* 삭제 버튼 */}
             <button
                 onClick={onRemove}
@@ -63,7 +63,7 @@ function SortableImage({ image, onRemove }: { image: UploadedImage; onRemove: ()
             >
                 <FiX size={16} />
             </button>
-            
+
             {/* 첫 번째 이미지 표시 */}
             {images.indexOf(image) === 0 && (
                 <div className="absolute bottom-2 left-2 bg-primary-600 text-white text-xs px-2 py-1 rounded">
@@ -112,7 +112,7 @@ export default function ImageUploader({
                     onChange={handleFileChange}
                     className="hidden"
                 />
-                
+
                 <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -122,7 +122,7 @@ export default function ImageUploader({
                     <FiUpload size={20} />
                     이미지 선택 ({images.length}/{maxImages})
                 </button>
-                
+
                 <p className="text-sm text-gray-500 mt-2">
                     • 최대 {maxImages}장까지 업로드 가능
                     <br />
@@ -141,9 +141,9 @@ export default function ImageUploader({
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                             {images.map((image) => (
                                 <SortableImage
-                                key={image.id}
-                                image={image}
-                                onRemove={() => onRemoveImage(image.id)}
+                                    key={image.id}
+                                    image={image}
+                                    onRemove={() => onRemoveImage(image.id)}
                                 />
                             ))}
                         </div>

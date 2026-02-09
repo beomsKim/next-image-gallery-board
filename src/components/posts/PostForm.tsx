@@ -152,8 +152,8 @@ export default function PostForm({ postId, initialData }: PostFormProps) {
             } else {
                 // 새 글 작성
                 const docRef = await addDoc(collection(db, 'posts'), {
-                ...postData,
-                createdAt: new Date(),
+                    ...postData,
+                    createdAt: new Date(),
                 });
                 setCreatedPostId(docRef.id);
             }
@@ -178,17 +178,17 @@ export default function PostForm({ postId, initialData }: PostFormProps) {
             if (categoryDoc.exists()) {
                 // 기존 카테고리 업데이트
                 await updateDoc(categoryRef, {
-                postCount: categoryDoc.data().postCount + 1,
+                    postCount: categoryDoc.data().postCount + 1,
                 });
             } else {
                 // 새 카테고리 생성
                 await setDoc(categoryRef, {
-                id: normalizedName,
-                name: categoryName,
-                isDefault: false,
-                isPinned: false,
-                postCount: 1,
-                createdAt: new Date(),
+                    id: normalizedName,
+                    name: categoryName,
+                    isDefault: false,
+                    isPinned: false,
+                    postCount: 1,
+                    createdAt: new Date(),
                 });
             }
         } catch (error) {
@@ -308,7 +308,7 @@ export default function PostForm({ postId, initialData }: PostFormProps) {
                     message={uploading ? '이미지 업로드 중...' : '게시글 저장 중...'}
                 />
             )}
-            
+
             {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
             {/* 성공 모달 */}

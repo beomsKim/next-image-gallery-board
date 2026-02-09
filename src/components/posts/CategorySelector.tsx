@@ -32,9 +32,9 @@ export default function CategorySelector({
                 id: doc.id,
                 ...doc.data(),
             })) as Category[];
-            
+
             setCategories(categoriesData);
-            
+
             // 기본 카테고리가 없으면 선택
             if (!selectedCategory && categoriesData.length > 0) {
                 const defaultCategory = categoriesData.find((c) => c.isDefault);
@@ -60,7 +60,7 @@ export default function CategorySelector({
             <label className="block text-sm font-medium mb-2">
                 카테고리 <span className="text-red-500">*</span>
             </label>
-            
+
             {/* 기존 카테고리 선택 */}
             <div className="flex flex-wrap gap-2 mb-2">
                 {categories.map((category) => (
@@ -68,17 +68,16 @@ export default function CategorySelector({
                         key={category.id}
                         type="button"
                         onClick={() => onSelectCategory(category.name)}
-                        className={`px-4 py-2 rounded-lg transition-colors ${
-                        selectedCategory === category.name
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                        }`}
+                        className={`px-4 py-2 rounded-lg transition-colors ${selectedCategory === category.name
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                            }`}
                     >
                         {category.name}
                         {category.isPinned && ' 📌'}
                     </button>
                 ))}
-                
+
                 {allowNew && !showNewInput && (
                     <button
                         type="button"
@@ -89,7 +88,7 @@ export default function CategorySelector({
                     </button>
                 )}
             </div>
-            
+
             {/* 새 카테고리 입력 */}
             {showNewInput && (
                 <div className="flex gap-2 mb-2">
@@ -112,8 +111,8 @@ export default function CategorySelector({
                     <button
                         type="button"
                         onClick={() => {
-                        setShowNewInput(false);
-                        setNewCategory('');
+                            setShowNewInput(false);
+                            setNewCategory('');
                         }}
                         className="btn-secondary"
                     >
@@ -121,7 +120,7 @@ export default function CategorySelector({
                     </button>
                 </div>
             )}
-            
+
             {/* 선택된 카테고리 표시 */}
             {selectedCategory && (
                 <p className="text-sm text-gray-600">

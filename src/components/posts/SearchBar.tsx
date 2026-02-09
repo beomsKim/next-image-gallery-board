@@ -63,11 +63,10 @@ export default function SearchBar({
                     <button
                         key={cat.id}
                         onClick={() => onCategoryChange(cat.name)}
-                        className={`px-4 py-2 rounded-lg transition-colors ${
-                        category === cat.name
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-                        }`}
+                        className={`px-4 py-2 rounded-lg transition-colors ${category === cat.name
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                            }`}
                     >
                         {cat.name} {cat.isPinned && '📌'} ({cat.postCount})
                     </button>

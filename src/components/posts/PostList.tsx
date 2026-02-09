@@ -203,24 +203,24 @@ export default function PostList() {
                 {/* 게시글 그리드 */}
                 {loading ? (
                     <Loading message="게시글을 불러오는 중..." />
-                    ) : posts.length === 0 ? (
+                ) : posts.length === 0 ? (
                     <div className="text-center py-20">
                         <p className="text-gray-500 text-lg">
                             {searchQuery ? '검색 결과가 없습니다.' : '게시글이 없습니다.'}
                         </p>
                     </div>
                 ) : (
-                <div className="grid grid-cols-1 xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 3xl:grid-cols-8 gap-4">
-                    {posts.map((post) => (
-                        <PostCard
-                            key={post.id}
-                            post={post}
-                            showCheckbox={!!user}
-                            checked={selectedPosts.has(post.id)}
-                            onCheck={handleSelectPost}
-                        />
-                    ))}
-                </div>
+                    <div className="grid grid-cols-1 xs:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 3xl:grid-cols-8 gap-4">
+                        {posts.map((post) => (
+                            <PostCard
+                                key={post.id}
+                                post={post}
+                                showCheckbox={!!user}
+                                checked={selectedPosts.has(post.id)}
+                                onCheck={handleSelectPost}
+                            />
+                        ))}
+                    </div>
                 )}
             </div>
 

@@ -11,7 +11,7 @@ import Modal from '@/components/common/Modal';
 export default function ResetPasswordForm() {
     const router = useRouter();
     const { resetPassword } = useAuth();
-    
+
     const [email, setEmail] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -26,14 +26,14 @@ export default function ResetPasswordForm() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!validateEmail(email)) {
             setToast({ message: '올바른 이메일을 입력해주세요.', type: 'error' });
             return;
         }
 
         setLoading(true);
-        
+
         try {
             await resetPassword(email);
             setShowSuccessModal(true);
@@ -57,7 +57,7 @@ export default function ResetPasswordForm() {
                     <p className="text-gray-600 text-center mb-6 text-sm">
                         가입하신 이메일로 비밀번호 재설정 링크를 보내드립니다.
                     </p>
-                    
+
                     {/* 이메일 */}
                     <div className="mb-6">
                         <label className="block text-sm font-medium mb-2">이메일</label>
@@ -73,7 +73,7 @@ export default function ResetPasswordForm() {
                             <p className="text-red-500 text-sm mt-1">{error}</p>
                         )}
                     </div>
-                    
+
                     {/* 전송 버튼 */}
                     <button
                         type="submit"
@@ -82,7 +82,7 @@ export default function ResetPasswordForm() {
                     >
                         {loading ? '전송 중...' : '재설정 링크 전송'}
                     </button>
-                    
+
                     {/* 로그인 링크 */}
                     <div className="text-center text-sm">
                         <button
@@ -95,10 +95,10 @@ export default function ResetPasswordForm() {
                     </div>
                 </form>
             </div>
-            
+
             {loading && <Loading message="전송 중입니다..." />}
             {toast && <Toast {...toast} onClose={() => setToast(null)} />}
-            
+
             {/* 성공 모달 */}
             <Modal
                 isOpen={showSuccessModal}

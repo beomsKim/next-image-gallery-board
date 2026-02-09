@@ -51,17 +51,17 @@ const generateRandomNickname = (): string => {
         '멋진', '활발한', '조용한', '밝은', '따뜻한',
         '시원한', '부드러운', '강한', '빠른', '느긋한',
     ];
-    
+
     const nouns = [
         '고양이', '강아지', '토끼', '햄스터', '새',
         '나무', '꽃', '구름', '별', '달',
         '바람', '파도', '산', '강', '호수',
     ];
-    
+
     const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
     const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
     const randomNumber = Math.floor(1000 + Math.random() * 9000);
-    
+
     return `${randomAdjective}${randomNoun}${randomNumber}`;
 };
 
@@ -74,7 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (firebaseUser) {
                 // Firestore에서 사용자 정보 가져오기
                 const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-                
+
                 if (userDoc.exists()) {
                     const userData = userDoc.data();
                     setUser({
@@ -105,7 +105,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             // 랜덤 닉네임 생성
             let nickname = generateRandomNickname();
-            
+
             // 닉네임 중복 확인 (최대 10번 시도)
             let attempts = 0;
             while (attempts < 10) {
@@ -160,21 +160,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             // Firestore에 사용자 정보가 없으면 생성
             const userDoc = await getDoc(doc(db, 'users', user.uid));
-            
+
             if (!userDoc.exists()) {
                 const nickname = generateRandomNickname();
                 const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
                 const isAdmin = user.email === adminEmail;
 
                 await setDoc(doc(db, 'users', user.uid), {
-                uid: user.uid,
-                email: user.email,
-                nickname: nickname,
-                isAdmin: isAdmin,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                likedPosts: [],
-                bookmarkedPosts: [],
+                    uid: user.uid,
+                    email: user.email,
+                    nickname: nickname,
+                    isAdmin: isAdmin,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    likedPosts: [],
+                    bookmarkedPosts: [],
                 });
             }
         } catch (error: any) {
@@ -244,7 +244,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (data.nickname && data.nickname !== user.nickname) {
                 const isAvailable = await checkNicknameAvailability(data.nickname);
                 if (!isAvailable) {
-                throw new Error('이미 사용 중인 닉네임입니다.');
+                    throw new Error('이미 사용 중인 닉네임입니다.');
                 }
                 updates.nickname = data.nickname;
                 await updateProfile(auth.currentUser, { displayName: data.nickname });
@@ -311,22 +311,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 const getErrorMessage = (code: string): string => {
     switch (code) {
         case 'auth/email-already-in-use':
-        return '이미 사용 중인 이메일입니다.';
+            return '이미 사용 중인 이메일입니다.';
         case 'auth/weak-password':
-        return '비밀번호는 6자 이상이어야 합니다.';
+            return '비밀번호는 6자 이상이어야 합니다.';
         case 'auth/invalid-email':
-        return '올바른 이메일 형식이 아닙니다.';
+            return '올바른 이메일 형식이 아닙니다.';
         case 'auth/user-not-found':
-        return '존재하지 않는 계정입니다.';
+            return '존재하지 않는 계정입니다.';
         case 'auth/wrong-password':
-        return '비밀번호가 올바르지 않습니다.';
+            return '비밀번호가 올바르지 않습니다.';
         case 'auth/too-many-requests':
-        return '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.';
+            return '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.';
         case 'auth/network-request-failed':
-        return '네트워크 연결을 확인해주세요.';
+            return '네트워크 연결을 확인해주세요.';
         case 'auth/requires-recent-login':
-        return '보안을 위해 다시 로그인해주세요.';
+            return '보안을 위해 다시 로그인해주세요.';
         default:
-        return '오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+            return '오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
     }
 };

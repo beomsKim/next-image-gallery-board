@@ -1,13 +1,13 @@
 import { ReactNode } from 'react';
 
 interface ModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  title?: string;
-  children: ReactNode;
-  confirmText?: string;
-  cancelText?: string;
-  onConfirm?: () => void;
+    isOpen: boolean;
+    onClose: () => void;
+    title?: string;
+    children: ReactNode;
+    confirmText?: string;
+    cancelText?: string;
+    onConfirm?: () => void;
 }
 
 export default function Modal({
@@ -30,12 +30,12 @@ export default function Modal({
                         <h3 className="text-lg font-semibold">{title}</h3>
                     </div>
                 )}
-                
+
                 {/* 내용 */}
                 <div className="px-6 py-4">
                     {children}
                 </div>
-                
+
                 {/* 버튼 */}
                 <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-2">
                     <button
@@ -46,10 +46,10 @@ export default function Modal({
                     </button>
                     {onConfirm && (
                         <button
-                        onClick={onConfirm}
-                        className="btn-primary"
+                            onClick={onConfirm}
+                            className="btn-primary"
                         >
-                        {confirmText}
+                            {confirmText}
                         </button>
                     )}
                 </div>

@@ -23,7 +23,7 @@ interface PostCardProps {
 export default function PostCard({ post, showCheckbox, checked, onCheck }: PostCardProps) {
     const router = useRouter();
     const { user } = useAuth();
-    
+
     const [liked, setLiked] = useState(user?.likedPosts?.includes(post.id) || false);
     const [bookmarked, setBookmarked] = useState(user?.bookmarkedPosts?.includes(post.id) || false);
     const [likeCount, setLikeCount] = useState(post.likes);
@@ -159,8 +159,8 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
                 <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
                     <button
                         onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/?author=${post.authorNickname}`);
+                            e.stopPropagation();
+                            router.push(`/?author=${post.authorNickname}`);
                         }}
                         className="hover:underline"
                     >
@@ -178,9 +178,8 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
                         </div>
                         <button
                             onClick={handleLike}
-                            className={`flex items-center gap-1 transition-colors ${
-                                liked ? 'text-red-500' : 'hover:text-red-500'
-                            }`}
+                            className={`flex items-center gap-1 transition-colors ${liked ? 'text-red-500' : 'hover:text-red-500'
+                                }`}
                         >
                             {liked ? <AiFillHeart size={18} /> : <AiOutlineHeart size={18} />}
                             {formatNumber(likeCount)}
@@ -189,9 +188,8 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
 
                     <button
                         onClick={handleBookmark}
-                        className={`transition-colors ${
-                        bookmarked ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'
-                        }`}
+                        className={`transition-colors ${bookmarked ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'
+                            }`}
                     >
                         {bookmarked ? <BsBookmarkFill size={18} /> : <BsBookmark size={18} />}
                     </button>

@@ -115,54 +115,54 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
                         <div className="border-b pb-4 mb-6">
                             <div className="flex items-start justify-between mb-4">
                                 <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-sm bg-gray-100 px-3 py-1 rounded">
-                                    {post.category}
-                                    </span>
-                                    {post.isPinned && (
-                                    <span className="text-sm bg-primary-100 text-primary-700 px-3 py-1 rounded">
-                                        📌 고정
-                                    </span>
-                                    )}
-                                </div>
-                                <h1 className="text-3xl font-bold mb-4">{post.title}</h1>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-sm bg-gray-100 px-3 py-1 rounded">
+                                            {post.category}
+                                        </span>
+                                        {post.isPinned && (
+                                            <span className="text-sm bg-primary-100 text-primary-700 px-3 py-1 rounded">
+                                                📌 고정
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h1 className="text-3xl font-bold mb-4">{post.title}</h1>
                                 </div>
 
                                 {canEdit && (
-                                <div className="flex gap-2">
-                                    <button onClick={handleEdit} className="btn-secondary">
-                                    <FiEdit size={18} />
-                                    </button>
-                                    <button
-                                    onClick={() => setShowDeleteModal(true)}
-                                    className="btn-secondary text-red-600"
-                                    >
-                                    <FiTrash2 size={18} />
-                                    </button>
-                                </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={handleEdit} className="btn-secondary">
+                                            <FiEdit size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => setShowDeleteModal(true)}
+                                            className="btn-secondary text-red-600"
+                                        >
+                                            <FiTrash2 size={18} />
+                                        </button>
+                                    </div>
                                 )}
                             </div>
 
                             <div className="flex items-center justify-between text-sm text-gray-600">
                                 <div className="flex items-center gap-4">
-                                <span>{post.authorNickname}</span>
-                                <span>{formatDateTime(post.createdAt.toDate())}</span>
-                                {post.updatedAt && post.updatedAt !== post.createdAt && (
-                                    <span className="text-gray-400">
-                                    (수정: {formatDateTime(post.updatedAt.toDate())})
-                                    </span>
-                                )}
+                                    <span>{post.authorNickname}</span>
+                                    <span>{formatDateTime(post.createdAt.toDate())}</span>
+                                    {post.updatedAt && post.updatedAt !== post.createdAt && (
+                                        <span className="text-gray-400">
+                                            (수정: {formatDateTime(post.updatedAt.toDate())})
+                                        </span>
+                                    )}
                                 </div>
 
                                 <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-1">
-                                    <AiOutlineEye size={18} />
-                                    {formatNumber(post.views)}
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <AiOutlineHeart size={18} />
-                                    {formatNumber(post.likes)}
-                                </div>
+                                    <div className="flex items-center gap-1">
+                                        <AiOutlineEye size={18} />
+                                        {formatNumber(post.views)}
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <AiOutlineHeart size={18} />
+                                        {formatNumber(post.likes)}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -171,12 +171,12 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
                         <div className="mb-6">
                             {post.images.map((imageUrl, index) => (
                                 <div key={index} className="mb-4 relative aspect-video w-full">
-                                <Image
-                                    src={imageUrl}
-                                    alt={`${post.title} - ${index + 1}`}
-                                    fill
-                                    className="object-contain rounded-lg"
-                                />
+                                    <Image
+                                        src={imageUrl}
+                                        alt={`${post.title} - ${index + 1}`}
+                                        fill
+                                        className="object-contain rounded-lg"
+                                    />
                                 </div>
                             ))}
                         </div>
