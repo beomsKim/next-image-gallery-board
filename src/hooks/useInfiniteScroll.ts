@@ -59,10 +59,14 @@ export const useInfiniteScroll = <T extends DocumentData>({
                 return;
             }
 
+            // const newItems = snapshot.docs.map((doc) => ({
+            //     id: doc.id,
+            //     ...doc.data(),
+            // })) as T[];
             const newItems = snapshot.docs.map((doc) => ({
                 id: doc.id,
                 ...doc.data(),
-            })) as T[];
+            })) as unknown as T[];
 
             setItems((prev) => [...prev, ...newItems]);
             setLastDoc(snapshot.docs[snapshot.docs.length - 1]);

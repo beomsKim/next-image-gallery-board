@@ -74,7 +74,7 @@ export default function SearchBar({
             </div>
 
             {/* 정렬 & 검색 */}
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col md:flex-row gap-2">
                 {/* 정렬 */}
                 <select
                     value={sortBy}
@@ -90,7 +90,7 @@ export default function SearchBar({
                 </select>
 
                 {/* 검색 */}
-                <div className="flex-1 flex gap-2">
+                <div className="flex-2 flex gap-2">
                     <input
                         type="text"
                         value={searchInput}

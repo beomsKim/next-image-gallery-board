@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc, updateDoc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, setDoc, deleteDoc, getDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAdminCheck } from '@/hooks/useAdminCheck';
 import { Post } from '@/types/post';
@@ -10,6 +10,11 @@ import { User } from '@/types/user';
 import Loading from '@/components/common/Loading';
 import Toast from '@/components/common/Toast';
 import Modal from '@/components/common/Modal';
+
+// 헬퍼 함수
+const getTime = (date: Date | Timestamp): number => {
+    return date instanceof Date ? date.getTime() : date.toDate().getTime();
+};
 
 export default function AdminPage() {
     const { user, loading: authLoading } = useAdminCheck();
@@ -97,12 +102,11 @@ export default function AdminPage() {
         postsData.sort((a, b) => {
             if (a.isPinned && !b.isPinned) return -1;
             if (!a.isPinned && b.isPinned) return 1;
-            return b.createdAt.toDate().getTime() - a.createdAt.toDate().getTime();
+            return getTime(b.createdAt) - getTime(a.createdAt);
         });
 
         setPosts(postsData);
     };
-
     // 관리자 추가
     const handleAddAdmin = async () => {
         if (!newAdminEmail.trim()) {
@@ -304,8 +308,8 @@ export default function AdminPage() {
                         <button
                             onClick={() => setActiveTab('users')}
                             className={`px-6 py-3 rounded-lg transition-colors ${activeTab === 'users'
-                                    ? 'bg-primary-600 text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-100'
                                 }`}
                         >
                             사용자 관리
@@ -313,8 +317,8 @@ export default function AdminPage() {
                         <button
                             onClick={() => setActiveTab('categories')}
                             className={`px-6 py-3 rounded-lg transition-colors ${activeTab === 'categories'
-                                    ? 'bg-primary-600 text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-100'
                                 }`}
                         >
                             카테고리 관리
@@ -322,8 +326,8 @@ export default function AdminPage() {
                         <button
                             onClick={() => setActiveTab('posts')}
                             className={`px-6 py-3 rounded-lg transition-colors ${activeTab === 'posts'
-                                    ? 'bg-primary-600 text-white'
-                                    : 'bg-white text-gray-700 hover:bg-gray-100'
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-100'
                                 }`}
                         >
                             게시글 관리
@@ -370,7 +374,8 @@ export default function AdminPage() {
                                                             {u.isAdmin ? '✅' : '-'}
                                                         </td>
                                                         <td className="px-4 py-2 text-center text-sm text-gray-600">
-                                                            {u.createdAt?.toDate().toLocaleDateString('ko-KR')}
+                                                            {/* {u.createdAt?.toDate().toLocaleDateString('ko-KR')} */}
+                                                            {u.createdAt?.toLocaleDateString('ko-KR')}
                                                         </td>
                                                         <td className="px-4 py-2 text-center">
                                                             {u.isAdmin && u.email !== process.env.NEXT_PUBLIC_ADMIN_EMAIL && (

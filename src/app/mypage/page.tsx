@@ -96,7 +96,7 @@ export default function MyPage() {
     }
 
     const tabs = [
-        { id: 'my' as TabType, label: '내가 쓴 글', count: posts.length },
+        { id: 'my' as TabType, label: `내가 쓴 글 (${posts.length})`, count: posts.length },
         { id: 'liked' as TabType, label: '좋아요한 글', count: user.likedPosts.length },
         { id: 'bookmarked' as TabType, label: '북마크한 글', count: user.bookmarkedPosts.length },
     ];

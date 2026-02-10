@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import Image from 'next/image';
 import { DndContext, closestCenter, DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, arrayMove, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { FiUpload, FiX } from 'react-icons/fi';
 import { MdDragIndicator } from 'react-icons/md';
@@ -17,7 +17,15 @@ interface ImageUploaderProps {
     maxImages?: number;
 }
 
-function SortableImage({ image, onRemove }: { image: UploadedImage; onRemove: () => void }) {
+function SortableImage({
+    image,
+    images,
+    onRemove
+}: {
+    image: UploadedImage;
+    images: UploadedImage[];
+    onRemove: () => void
+}) {
     const {
         attributes,
         listeners,
@@ -86,7 +94,7 @@ export default function ImageUploader({
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             onAddImages(e.target.files);
-            e.target.value = ''; // 같은 파일 재선택 가능하도록
+            e.target.value = '';
         }
     };
 
@@ -143,6 +151,7 @@ export default function ImageUploader({
                                 <SortableImage
                                     key={image.id}
                                     image={image}
+                                    images={images}
                                     onRemove={() => onRemoveImage(image.id)}
                                 />
                             ))}

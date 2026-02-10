@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { doc, getDoc, updateDoc, deleteDoc, increment } from 'firebase/firestore';
@@ -16,10 +16,11 @@ import Loading from '@/components/common/Loading';
 import Toast from '@/components/common/Toast';
 import Modal from '@/components/common/Modal';
 
-export default function PostDetailPage({ params }: { params: { id: string } }) {
+export default function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id: postId } = use(params);  // ✅ Promise unwrap
+
     const router = useRouter();
     const { user } = useAuth();
-    const postId = params.id;
 
     const [post, setPost] = useState<Post | null>(null);
     const [loading, setLoading] = useState(true);
@@ -58,8 +59,8 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
             setPost(postData);
 
             if (user) {
-                setLiked(user.likedPosts.includes(postId));
-                setBookmarked(user.bookmarkedPosts.includes(postId));
+                setLiked(user.likedPosts?.includes(postId) || false);
+                setBookmarked(user.bookmarkedPosts?.includes(postId) || false);
             }
         } catch (error) {
             console.error('게시글 로드 실패:', error);
@@ -146,10 +147,10 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
                             <div className="flex items-center justify-between text-sm text-gray-600">
                                 <div className="flex items-center gap-4">
                                     <span>{post.authorNickname}</span>
-                                    <span>{formatDateTime(post.createdAt.toDate())}</span>
+                                    <span>{formatDateTime(post.createdAt instanceof Date ? post.createdAt : post.createdAt.toDate())}</span>
                                     {post.updatedAt && post.updatedAt !== post.createdAt && (
                                         <span className="text-gray-400">
-                                            (수정: {formatDateTime(post.updatedAt.toDate())})
+                                            (수정: {formatDateTime(post.updatedAt instanceof Date ? post.updatedAt : post.updatedAt.toDate())})
                                         </span>
                                     )}
                                 </div>
@@ -168,18 +169,20 @@ export default function PostDetailPage({ params }: { params: { id: string } }) {
                         </div>
 
                         {/* 이미지 갤러리 */}
-                        <div className="mb-6">
-                            {post.images.map((imageUrl, index) => (
-                                <div key={index} className="mb-4 relative aspect-video w-full">
-                                    <Image
-                                        src={imageUrl}
-                                        alt={`${post.title} - ${index + 1}`}
-                                        fill
-                                        className="object-contain rounded-lg"
-                                    />
-                                </div>
-                            ))}
-                        </div>
+                        {post.images && post.images.length > 0 && (
+                            <div className="mb-6">
+                                {post.images.map((imageUrl, index) => (
+                                    <div key={index} className="mb-4 relative aspect-video w-full">
+                                        <Image
+                                            src={imageUrl}
+                                            alt={`${post.title} - ${index + 1}`}
+                                            fill
+                                            className="object-contain rounded-lg"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         {/* 내용 */}
                         {post.content && (

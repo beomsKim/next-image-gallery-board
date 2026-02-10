@@ -1,5 +1,7 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from 'next';
+
+
+const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
@@ -8,15 +10,18 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'lh3.googleusercontent.com', // Google 프로필 이미지
+        hostname: 'lh3.googleusercontent.com',
       },
     ],
   },
-  // 성능 최적화
   compress: true,
   poweredByHeader: false,
-  // 프로덕션 빌드 최적화
-  swcMinify: true,
 };
 
-module.exports = nextConfig;
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
+module.exports = withBundleAnalyzer(nextConfig);
+
+export default nextConfig;

@@ -1,3 +1,4 @@
+import { Timestamp } from 'firebase/firestore';
 export interface Post {
     id: string;
     title: string;
@@ -10,8 +11,8 @@ export interface Post {
     views: number;
     likes: number;
     isPinned: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt: Timestamp | Date;
+    updatedAt: Timestamp | Date;
 }
 
 export interface PostFormData {

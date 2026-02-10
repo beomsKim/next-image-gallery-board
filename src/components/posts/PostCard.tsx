@@ -134,12 +134,21 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
 
                 {/* 썸네일 */}
                 <div className="relative aspect-square w-full bg-gray-100 rounded-lg overflow-hidden mb-3">
-                    <Image
+                    {/* <Image
                         src={post.thumbnailUrl || '/images/default-thumbnail.png'}
                         alt={post.title}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform"
                         loading="lazy"
+                    /> */}
+                    <Image
+                        src={post.thumbnailUrl}
+                        alt={post.title}
+                        fill
+                        className="object-cover"
+                        loading="lazy"
+                        placeholder="blur"
+                        blurDataURL="/images/default-thumbnail.png"
                     />
                 </div>
 
@@ -166,7 +175,7 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
                     >
                         {post.authorNickname}
                     </button>
-                    <span>{formatRelativeTime(post.createdAt.toDate())}</span>
+                    <span>{formatRelativeTime(post.createdAt instanceof Date ? post.createdAt : post.createdAt.toDate())}</span>
                 </div>
 
                 {/* 통계 */}
