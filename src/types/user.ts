@@ -1,10 +1,12 @@
+import { Timestamp } from 'firebase/firestore';
+
 export interface User {
     uid: string;
     email: string;
     nickname: string;
     isAdmin: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt: Timestamp | Date;
+    updatedAt: Timestamp | Date;
     likedPosts: string[];
     bookmarkedPosts: string[];
 }

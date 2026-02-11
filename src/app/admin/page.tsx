@@ -16,6 +16,13 @@ const getTime = (date: Date | Timestamp): number => {
     return date instanceof Date ? date.getTime() : date.toDate().getTime();
 };
 
+// 날짜 포맷 헬퍼 함수
+const formatDate = (date: Date | Timestamp | undefined): string => {
+  if (!date) return '-';
+  const dateObj = date instanceof Date ? date : date.toDate();
+  return dateObj.toLocaleDateString('ko-KR');
+};
+
 export default function AdminPage() {
     const { user, loading: authLoading } = useAdminCheck();
 
@@ -374,8 +381,7 @@ export default function AdminPage() {
                                                             {u.isAdmin ? '✅' : '-'}
                                                         </td>
                                                         <td className="px-4 py-2 text-center text-sm text-gray-600">
-                                                            {/* {u.createdAt?.toDate().toLocaleDateString('ko-KR')} */}
-                                                            {u.createdAt?.toLocaleDateString('ko-KR')}
+                                                            {formatDate(u.createdAt)}
                                                         </td>
                                                         <td className="px-4 py-2 text-center">
                                                             {u.isAdmin && u.email !== process.env.NEXT_PUBLIC_ADMIN_EMAIL && (
