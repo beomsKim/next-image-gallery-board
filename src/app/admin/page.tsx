@@ -635,7 +635,8 @@ export default function AdminPage() {
                                                 type="text"
                                                 value={newForbiddenNickname}
                                                 onChange={(e) => setNewForbiddenNickname(e.target.value)}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleAddForbiddenNickname()}
+                                                // onKeyDown={(e) => e.key === 'Enter' && handleAddForbiddenNickname()}
+                                                onKeyDown={(e) => e.key === 'Enter'}
                                                 placeholder="금지할 닉네임 단어 입력"
                                                 className="input-field flex-1"
                                             />
