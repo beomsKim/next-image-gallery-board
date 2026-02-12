@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useNicknameCheck } from '@/hooks/useNicknameCheck';
+import { getFilterWords, isForbiddenNickname } from '@/utils/filterWords';
 import Loading from '@/components/common/Loading';
 import Toast from '@/components/common/Toast';
 import Modal from '@/components/common/Modal';
@@ -33,6 +34,15 @@ export default function ProfilePage() {
         e.preventDefault();
 
         if (!user) return;
+
+        // 금지 닉네임 검사
+        if (nickname !== user.nickname) {
+            const { forbiddenNicknames } = await getFilterWords();
+            if (isForbiddenNickname(nickname, forbiddenNicknames)) {
+                setToast({ message: '사용할 수 없는 닉네임입니다.', type: 'error' });
+                return;
+            }
+        }
 
         // 변경사항 확인
         if (nickname === user.nickname && email === user.email) {
@@ -115,10 +125,10 @@ export default function ProfilePage() {
                             {nickname !== user.nickname && (
                                 <p
                                     className={`text-sm mt-1 ${isChecking
-                                            ? 'text-gray-500'
-                                            : isAvailable
-                                                ? 'text-green-600'
-                                                : 'text-red-600'
+                                        ? 'text-gray-500'
+                                        : isAvailable
+                                            ? 'text-green-600'
+                                            : 'text-red-600'
                                         }`}
                                 >
                                     {isChecking ? '확인 중...' : nicknameMessage}

@@ -16,7 +16,17 @@ import {
     updatePassword,
     deleteUser,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import {
+    collection,
+    query,
+    where,
+    getDocs,
+    updateDoc,
+    deleteDoc,
+    doc,
+    getDoc,
+    setDoc
+} from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { User, UserProfile } from '@/types/user';
 
@@ -268,7 +278,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    // 회원 탈퇴
+    // 회원 탈퇴 함수
     const deleteAccount = async () => {
         try {
             if (!auth.currentUser || !user) {
@@ -276,17 +286,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
 
             const userId = user.uid;
+            setLoading(true);
 
-            // Firestore 사용자 문서 삭제
+            // 1. 해당 유저의 게시글 작성자명 "탈퇴한 사용자"로 변경
+            const postsQuery = query(
+                collection(db, 'posts'),
+                where('authorId', '==', userId)
+            );
+            const postsSnapshot = await getDocs(postsQuery);
+
+            if (!postsSnapshot.empty) {
+                const updatePromises = postsSnapshot.docs.map((postDoc) =>
+                    updateDoc(postDoc.ref, {
+                        authorNickname: '탈퇴한 사용자',
+                        // authorId는 유지 (나중에 관리 가능하도록)
+                    })
+                );
+                await Promise.all(updatePromises);
+            }
+
+            // 2. Firestore 사용자 문서 삭제
             await deleteDoc(doc(db, 'users', userId));
 
-            // Firebase Auth 사용자 삭제
+            // 3. Firebase Auth 사용자 삭제
             await deleteUser(auth.currentUser);
 
             setUser(null);
         } catch (error: any) {
             console.error('회원 탈퇴 실패:', error);
             throw new Error(getErrorMessage(error.code));
+        } finally {
+            setLoading(false);
         }
     };
 

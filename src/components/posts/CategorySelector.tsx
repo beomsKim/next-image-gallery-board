@@ -26,20 +26,29 @@ export default function CategorySelector({
 
     const loadCategories = async () => {
         try {
-            const q = query(collection(db, 'categories'), orderBy('name', 'asc'));
-            const snapshot = await getDocs(q);
-            const categoriesData = snapshot.docs.map((doc) => ({
+            const snapshot = await getDocs(
+                query(collection(db, 'categories'), orderBy('name', 'asc'))
+            );
+            const data = snapshot.docs.map((doc) => ({
                 id: doc.id,
                 ...doc.data(),
             })) as Category[];
 
-            setCategories(categoriesData);
+            data.sort((a, b) => {
+                if (a.isDefault && !b.isDefault) return -1;
+                if (!a.isDefault && b.isDefault) return 1;
+                if (a.isPinned && !b.isPinned) return -1;
+                if (!a.isPinned && b.isPinned) return 1;
+                return a.name.localeCompare(b.name, 'ko');
+            });
 
-            // 기본 카테고리가 없으면 선택
-            if (!selectedCategory && categoriesData.length > 0) {
-                const defaultCategory = categoriesData.find((c) => c.isDefault);
-                if (defaultCategory) {
-                    onSelectCategory(defaultCategory.name);
+            setCategories(data);
+
+            // ✅ 선택된 카테고리 없으면 "전체" 자동 선택
+            if (!selectedCategory) {
+                const defaultCat = data.find((c) => c.isDefault);
+                if (defaultCat) {
+                    onSelectCategory(defaultCat.name);
                 }
             }
         } catch (error) {
@@ -69,8 +78,8 @@ export default function CategorySelector({
                         type="button"
                         onClick={() => onSelectCategory(category.name)}
                         className={`px-4 py-2 rounded-lg transition-colors ${selectedCategory === category.name
-                                ? 'bg-primary-600 text-white'
-                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
                             }`}
                     >
                         {category.name}

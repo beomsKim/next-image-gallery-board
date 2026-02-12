@@ -4,6 +4,8 @@ import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { doc, getDoc, updateDoc, deleteDoc, increment } from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage';
+import { storage } from '@/lib/firebase';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Post } from '@/types/post';
@@ -84,15 +86,47 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
         router.push(`/posts/edit/${postId}`);
     };
 
+    // 게시글 삭제 함수
     const handleDelete = async () => {
         try {
+            setLoading(true);
+
+            // 1. Storage 이미지 삭제
+            if (post?.images && post.images.length > 0) {
+                const deleteImagePromises = post.images.map(async (imageUrl) => {
+                    try {
+                        const imageRef = ref(storage, imageUrl);
+                        await deleteObject(imageRef);
+                    } catch (err) {
+                        console.warn('이미지 삭제 실패 (무시):', err);
+                        // 이미지 삭제 실패해도 게시글 삭제는 진행
+                    }
+                });
+                await Promise.all(deleteImagePromises);
+            }
+
+            // 2. 카테고리 postCount 감소
+            if (post?.category) {
+                const categoryId = post.category.toLowerCase().replace(/\s+/g, '');
+                const categoryRef = doc(db, 'categories', categoryId);
+                const categoryDoc = await getDoc(categoryRef);
+                if (categoryDoc.exists() && categoryDoc.data().postCount > 0) {
+                    await updateDoc(categoryRef, {
+                        postCount: categoryDoc.data().postCount - 1,
+                    });
+                }
+            }
+
+            // 3. 게시글 삭제
             await deleteDoc(doc(db, 'posts', postId));
+
             setToast({ message: '게시글이 삭제되었습니다.', type: 'success' });
             setTimeout(() => router.push('/'), 1000);
         } catch (error) {
             console.error('삭제 실패:', error);
             setToast({ message: '삭제에 실패했습니다.', type: 'error' });
         } finally {
+            setLoading(false);
             setShowDeleteModal(false);
         }
     };

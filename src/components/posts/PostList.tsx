@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { collection, query, where, orderBy, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import {
+    collection, query, where, orderBy,
+    getDocs, deleteDoc, doc, getDoc, updateDoc
+} from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Post } from '@/types/post';
 import PostCard from './PostCard';
@@ -15,7 +19,7 @@ import Modal from '@/components/common/Modal';
 export default function PostList() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { user } = useAuth();
+    const { user } = useAuth();  // ✅ user가 null이어도 페이지 접근 허용
 
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
@@ -23,11 +27,11 @@ export default function PostList() {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-    // 필터 상태
     const [category, setCategory] = useState<string>('');
-    const [sortBy, setSortBy] = useState<'latest' | 'oldest' | 'views' | 'my' | 'liked' | 'bookmarked'>('latest');
+    const [sortBy, setSortBy] = useState<string>('latest');
     const [searchQuery, setSearchQuery] = useState('');
 
+    // ✅ 로그인 체크 없이 바로 로드
     useEffect(() => {
         loadPosts();
     }, [category, sortBy, searchQuery]);
@@ -37,30 +41,29 @@ export default function PostList() {
 
         try {
             let q = query(collection(db, 'posts'));
-
-            // 카테고리 필터
-            if (category && category !== '전체') {
-                q = query(q, where('category', '==', category));
-            }
-
-            // 작성자 필터
             const authorParam = searchParams.get('author');
-            if (authorParam) {
-                q = query(q, where('authorNickname', '==', authorParam));
-            }
 
-            // 내 글 필터
+            // 정렬 조건
             if (sortBy === 'my' && user) {
-                q = query(q, where('authorId', '==', user.uid));
-            }
-
-            // 정렬
-            if (sortBy === 'latest') {
-                q = query(q, orderBy('createdAt', 'desc'));
-            } else if (sortBy === 'oldest') {
-                q = query(q, orderBy('createdAt', 'asc'));
-            } else if (sortBy === 'views') {
-                q = query(q, orderBy('views', 'desc'));
+                q = query(q, where('authorId', '==', user.uid), orderBy('createdAt', 'desc'));
+            } else if (authorParam) {
+                q = query(q, where('authorNickname', '==', authorParam), orderBy('createdAt', 'desc'));
+            } else if (category && category !== '전체') {
+                if (sortBy === 'oldest') {
+                    q = query(q, where('category', '==', category), orderBy('createdAt', 'asc'));
+                } else if (sortBy === 'views') {
+                    q = query(q, where('category', '==', category), orderBy('views', 'desc'));
+                } else {
+                    q = query(q, where('category', '==', category), orderBy('createdAt', 'desc'));
+                }
+            } else {
+                if (sortBy === 'oldest') {
+                    q = query(q, orderBy('createdAt', 'asc'));
+                } else if (sortBy === 'views') {
+                    q = query(q, orderBy('views', 'desc'));
+                } else {
+                    q = query(q, orderBy('createdAt', 'desc'));
+                }
             }
 
             const snapshot = await getDocs(q);
@@ -69,11 +72,15 @@ export default function PostList() {
                 ...doc.data(),
             })) as Post[];
 
-            // 좋아요/북마크 필터 (클라이언트 측)
-            if (sortBy === 'liked' && user) {
-                postsData = postsData.filter((post) => user.likedPosts.includes(post.id));
-            } else if (sortBy === 'bookmarked' && user) {
-                postsData = postsData.filter((post) => user.bookmarkedPosts.includes(post.id));
+            // 좋아요/북마크 필터 (로그인 유저만)
+            if (user && sortBy === 'liked') {
+                postsData = postsData.filter((post) =>
+                    user.likedPosts?.includes(post.id)
+                );
+            } else if (user && sortBy === 'bookmarked') {
+                postsData = postsData.filter((post) =>
+                    user.bookmarkedPosts?.includes(post.id)
+                );
             }
 
             // 검색 필터
@@ -84,7 +91,7 @@ export default function PostList() {
                 );
             }
 
-            // 고정 게시글을 맨 위로
+            // 고정 게시글 맨 위로
             postsData.sort((a, b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
@@ -102,7 +109,11 @@ export default function PostList() {
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
-            setSelectedPosts(new Set(posts.map((p) => p.id)));
+            // ✅ 본인 글 또는 관리자만 선택 가능
+            const selectablePosts = posts.filter(
+                (p) => p.authorId === user?.uid || user?.isAdmin
+            );
+            setSelectedPosts(new Set(selectablePosts.map((p) => p.id)));
         } else {
             setSelectedPosts(new Set());
         }
@@ -118,31 +129,49 @@ export default function PostList() {
         setSelectedPosts(newSelected);
     };
 
-    const handleDeleteSelected = async () => {
+    const handleDeleteSelected = () => {
         if (selectedPosts.size === 0) {
             setToast({ message: '삭제할 게시글을 선택해주세요.', type: 'error' });
             return;
         }
-
         setShowDeleteModal(true);
     };
 
     const confirmDelete = async () => {
         try {
-            // 권한 확인
+            setLoading(true);
+
             const postsToDelete = posts.filter((p) => selectedPosts.has(p.id));
+
             const canDelete = postsToDelete.every(
                 (p) => p.authorId === user?.uid || user?.isAdmin
             );
 
             if (!canDelete) {
-                setToast({ message: '삭제 권한이 없는 게시글이 포함되어 있습니다.', type: 'error' });
+                setToast({
+                    message: '삭제 권한이 없는 게시글이 포함되어 있습니다.',
+                    type: 'error'
+                });
                 return;
             }
 
-            // 삭제 실행
             await Promise.all(
-                Array.from(selectedPosts).map((postId) => deleteDoc(doc(db, 'posts', postId)))
+                postsToDelete.map(async (post) => {
+                    // Storage 이미지 삭제
+                    if (post.images?.length > 0) {
+                        await Promise.all(
+                            post.images.map(async (imageUrl) => {
+                                try {
+                                    await deleteObject(ref(storage, imageUrl));
+                                } catch (err) {
+                                    console.warn('이미지 삭제 실패:', err);
+                                }
+                            })
+                        );
+                    }
+                    // 게시글 삭제
+                    await deleteDoc(doc(db, 'posts', post.id));
+                })
             );
 
             setToast({ message: '게시글이 삭제되었습니다.', type: 'success' });
@@ -152,6 +181,7 @@ export default function PostList() {
             console.error('삭제 실패:', error);
             setToast({ message: '삭제에 실패했습니다.', type: 'error' });
         } finally {
+            setLoading(false);
             setShowDeleteModal(false);
         }
     };
@@ -171,12 +201,15 @@ export default function PostList() {
                 {/* 상단 액션바 */}
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-4">
+                        {/* ✅ 로그인 유저만 체크박스/삭제 버튼 표시 */}
                         {user && (
                             <>
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="checkbox"
-                                        checked={selectedPosts.size === posts.length && posts.length > 0}
+                                        checked={selectedPosts.size === posts.filter(
+                                            p => p.authorId === user.uid || user.isAdmin
+                                        ).length && posts.length > 0}
                                         onChange={(e) => handleSelectAll(e.target.checked)}
                                         className="w-5 h-5"
                                     />
@@ -195,8 +228,9 @@ export default function PostList() {
                         )}
                     </div>
 
+                    {/* 게시글 개수 */}
                     <div className="text-sm text-gray-600">
-                        {posts.length === 0 ? '게시글 없음' : `총 ${posts.length}개`}
+                        {!loading && posts.length > 0 && `총 ${posts.length}개`}
                     </div>
                 </div>
 
@@ -215,7 +249,7 @@ export default function PostList() {
                             <PostCard
                                 key={post.id}
                                 post={post}
-                                showCheckbox={!!user}
+                                showCheckbox={!!user && (post.authorId === user.uid || user.isAdmin)}
                                 checked={selectedPosts.has(post.id)}
                                 onCheck={handleSelectPost}
                             />
@@ -226,7 +260,6 @@ export default function PostList() {
 
             {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
-            {/* 삭제 확인 모달 */}
             <Modal
                 isOpen={showDeleteModal}
                 onClose={() => setShowDeleteModal(false)}
@@ -237,9 +270,7 @@ export default function PostList() {
             >
                 <p className="text-gray-700">
                     정말 선택한 게시글을 삭제하시겠습니까?
-                    <br />
-                    <br />
-                    선택된 게시글: {selectedPosts.size}개
+                    <br />선택된 게시글: {selectedPosts.size}개
                 </p>
             </Modal>
         </>

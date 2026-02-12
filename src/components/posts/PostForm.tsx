@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { validateTitle, validateContent, validateCategory, normalizeCategory } from '@/utils/validation';
+import { getFilterWords, containsBadWord } from '@/utils/filterWords';
 import ImageUploader from './ImageUploader';
 import CategorySelector from './CategorySelector';
 import Loading from '@/components/common/Loading';
@@ -114,6 +115,24 @@ export default function PostForm({ postId, initialData }: PostFormProps) {
 
         if (!user) {
             setToast({ message: '로그인이 필요합니다.', type: 'error' });
+            return;
+        }
+
+        // 비속어 검사
+        const { badWords } = await getFilterWords();
+
+        if (containsBadWord(formData.title, badWords)) {
+            setToast({ message: '제목에 사용할 수 없는 단어가 포함되어 있습니다.', type: 'error' });
+            return;
+        }
+
+        if (formData.content && containsBadWord(formData.content, badWords)) {
+            setToast({ message: '내용에 사용할 수 없는 단어가 포함되어 있습니다.', type: 'error' });
+            return;
+        }
+
+        if (containsBadWord(formData.category, badWords)) {
+            setToast({ message: '카테고리에 사용할 수 없는 단어가 포함되어 있습니다.', type: 'error' });
             return;
         }
 
@@ -320,7 +339,7 @@ export default function PostForm({ postId, initialData }: PostFormProps) {
                 onConfirm={handleSuccessConfirm}
             >
                 <p className="text-gray-700">
-                    {postId ? '게시글이 수정되었습니다.' : '글쓰기가 완료되었습니다.'}
+                    {postId ? '게시글이 수정되었습니다.' : '게시글 작성이 완료되었습니다.'}
                 </p>
             </Modal>
         </>

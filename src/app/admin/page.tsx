@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, doc, updateDoc, setDoc, deleteDoc, getDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { ref, deleteObject } from 'firebase/storage';
+import { db, storage } from '@/lib/firebase';
 import { useAdminCheck } from '@/hooks/useAdminCheck';
 import { Post } from '@/types/post';
 import { Category } from '@/types/category';
 import { User } from '@/types/user';
+import { addFilterWord, removeFilterWord, getFilterWords } from '@/utils/filterWords';
 import Loading from '@/components/common/Loading';
 import Toast from '@/components/common/Toast';
 import Modal from '@/components/common/Modal';
@@ -18,15 +20,15 @@ const getTime = (date: Date | Timestamp): number => {
 
 // 날짜 포맷 헬퍼 함수
 const formatDate = (date: Date | Timestamp | undefined): string => {
-  if (!date) return '-';
-  const dateObj = date instanceof Date ? date : date.toDate();
-  return dateObj.toLocaleDateString('ko-KR');
+    if (!date) return '-';
+    const dateObj = date instanceof Date ? date : date.toDate();
+    return dateObj.toLocaleDateString('ko-KR');
 };
 
 export default function AdminPage() {
     const { user, loading: authLoading } = useAdminCheck();
 
-    const [activeTab, setActiveTab] = useState<'users' | 'categories' | 'posts'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'categories' | 'posts' | 'filters'>('users');
     const [users, setUsers] = useState<User[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [posts, setPosts] = useState<Post[]>([]);
@@ -46,9 +48,26 @@ export default function AdminPage() {
     const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
     const [deleteAction, setDeleteAction] = useState<'move' | 'delete'>('move');
 
+    // 필터 state 추가
+    const [badWords, setBadWords] = useState<string[]>([]);
+    const [forbiddenNicknames, setForbiddenNicknames] = useState<string[]>([]);
+    const [newBadWord, setNewBadWord] = useState('');
+    const [newForbiddenNickname, setNewForbiddenNickname] = useState('');
+
+    // 필터 로드
+    const loadFilters = async () => {
+        const { badWords, forbiddenNicknames } = await getFilterWords();
+        setBadWords(badWords);
+        setForbiddenNicknames(forbiddenNicknames);
+    };
+
     useEffect(() => {
         if (user && user.isAdmin) {
-            loadData();
+            if (activeTab === 'filters') {
+                loadFilters();
+            } else {
+                loadData();
+            }
         }
     }, [user, activeTab]);
 
@@ -236,29 +255,64 @@ export default function AdminPage() {
         }
     };
 
-    // 카테고리 삭제
+    // 카테고리 삭제 함수
     const handleDeleteCategory = async () => {
         if (!categoryToDelete) return;
 
+        setLoading(true);
+
         try {
-            // 해당 카테고리의 게시글 처리
-            const q = query(collection(db, 'posts'), where('category', '==', categoryToDelete.name));
+            // 해당 카테고리의 게시글 조회
+            const q = query(
+                collection(db, 'posts'),
+                where('category', '==', categoryToDelete.name)
+            );
             const snapshot = await getDocs(q);
 
             if (!snapshot.empty) {
                 if (deleteAction === 'delete') {
-                    // 게시글까지 모두 삭제
-                    await Promise.all(snapshot.docs.map((doc) => deleteDoc(doc.ref)));
+                    // 게시글 + Storage 이미지까지 모두 삭제
+                    const deletePromises = snapshot.docs.map(async (postDoc) => {
+                        const postData = postDoc.data();
+
+                        // Storage 이미지 삭제
+                        if (postData.images && postData.images.length > 0) {
+                            await Promise.all(
+                                postData.images.map(async (imageUrl: string) => {
+                                    try {
+                                        const imageRef = ref(storage, imageUrl);
+                                        await deleteObject(imageRef);
+                                    } catch (err) {
+                                        console.warn('이미지 삭제 실패 (무시):', err);
+                                    }
+                                })
+                            );
+                        }
+
+                        // 게시글 삭제
+                        await deleteDoc(postDoc.ref);
+                    });
+
+                    await Promise.all(deletePromises);
+
                 } else {
-                    // "전체"로 이동
-                    await Promise.all(
-                        snapshot.docs.map((doc) =>
-                            updateDoc(doc.ref, {
-                                category: '전체',
-                                updatedAt: new Date(),
-                            })
-                        )
+                    // "전체" 카테고리로 이동
+                    const movePromises = snapshot.docs.map((postDoc) =>
+                        updateDoc(postDoc.ref, {
+                            category: '전체',
+                            updatedAt: new Date(),
+                        })
                     );
+                    await Promise.all(movePromises);
+
+                    // "전체" 카테고리 postCount 업데이트
+                    const defaultCategoryRef = doc(db, 'categories', '전체');
+                    const defaultCategoryDoc = await getDoc(defaultCategoryRef);
+                    if (defaultCategoryDoc.exists()) {
+                        await updateDoc(defaultCategoryRef, {
+                            postCount: defaultCategoryDoc.data().postCount + snapshot.docs.length,
+                        });
+                    }
                 }
             }
 
@@ -272,6 +326,8 @@ export default function AdminPage() {
         } catch (error) {
             console.error('카테고리 삭제 실패:', error);
             setToast({ message: '카테고리 삭제에 실패했습니다.', type: 'error' });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -338,6 +394,15 @@ export default function AdminPage() {
                                 }`}
                         >
                             게시글 관리
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('filters')}
+                            className={`px-6 py-3 rounded-lg transition-colors ${activeTab === 'filters'
+                                ? 'bg-primary-600 text-white'
+                                : 'bg-white text-gray-700 hover:bg-gray-100'
+                                }`}
+                        >
+                            🚫 필터 관리
                         </button>
                     </div>
 
@@ -502,6 +567,113 @@ export default function AdminPage() {
                                                 </button>
                                             </div>
                                         ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 필터 관리 탭 컨텐츠 */}
+                            {activeTab === 'filters' && (
+                                <div className="space-y-8">
+                                    {/* 비속어 관리 */}
+                                    <div>
+                                        <h2 className="text-xl font-semibold mb-4">비속어 관리</h2>
+                                        <div className="flex gap-2 mb-4">
+                                            <input
+                                                type="text"
+                                                value={newBadWord}
+                                                onChange={(e) => setNewBadWord(e.target.value)}
+                                                // onKeyDown={(e) => e.key === 'Enter' && handleAddBadWord()}
+                                                onKeyDown={(e) => e.key === 'Enter'}
+                                                placeholder="금지할 단어 입력"
+                                                className="input-field flex-1"
+                                            />
+                                            <button
+                                                onClick={async () => {
+                                                    if (!newBadWord.trim()) return;
+                                                    await addFilterWord('badWords', newBadWord);
+                                                    setNewBadWord('');
+                                                    loadFilters();
+                                                }}
+                                                className="btn-primary shrink-0"
+                                            >
+                                                추가
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {badWords.length === 0 ? (
+                                                <p className="text-gray-400 text-sm">등록된 비속어가 없습니다.</p>
+                                            ) : (
+                                                badWords.map((word) => (
+                                                    <span
+                                                        key={word}
+                                                        className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 rounded-full text-sm border border-red-200"
+                                                    >
+                                                        {word}
+                                                        <button
+                                                            onClick={async () => {
+                                                                await removeFilterWord('badWords', word);
+                                                                loadFilters();
+                                                            }}
+                                                            className="ml-1 hover:text-red-900 font-bold"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </span>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* 금지 닉네임 관리 */}
+                                    <div>
+                                        <h2 className="text-xl font-semibold mb-4">금지 닉네임 관리</h2>
+                                        <p className="text-sm text-gray-500 mb-3">
+                                            해당 단어가 포함된 닉네임은 사용 불가합니다. (예: 운영자, 관리자, GM 등)
+                                        </p>
+                                        <div className="flex gap-2 mb-4">
+                                            <input
+                                                type="text"
+                                                value={newForbiddenNickname}
+                                                onChange={(e) => setNewForbiddenNickname(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleAddForbiddenNickname()}
+                                                placeholder="금지할 닉네임 단어 입력"
+                                                className="input-field flex-1"
+                                            />
+                                            <button
+                                                onClick={async () => {
+                                                    if (!newForbiddenNickname.trim()) return;
+                                                    await addFilterWord('forbiddenNicknames', newForbiddenNickname);
+                                                    setNewForbiddenNickname('');
+                                                    loadFilters();
+                                                }}
+                                                className="btn-primary shrink-0"
+                                            >
+                                                추가
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {forbiddenNicknames.length === 0 ? (
+                                                <p className="text-gray-400 text-sm">등록된 금지 닉네임이 없습니다.</p>
+                                            ) : (
+                                                forbiddenNicknames.map((word) => (
+                                                    <span
+                                                        key={word}
+                                                        className="flex items-center gap-1 px-3 py-1.5 bg-orange-50 text-orange-700 rounded-full text-sm border border-orange-200"
+                                                    >
+                                                        {word}
+                                                        <button
+                                                            onClick={async () => {
+                                                                await removeFilterWord('forbiddenNicknames', word);
+                                                                loadFilters();
+                                                            }}
+                                                            className="ml-1 hover:text-orange-900 font-bold"
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </span>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
