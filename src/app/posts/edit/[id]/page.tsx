@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -8,16 +8,19 @@ import { useAuth } from '@/hooks/useAuth';
 import PostForm from '@/components/posts/PostForm';
 import Loading from '@/components/common/Loading';
 
-export default function EditPostPage({ params }: { params: { id: string } }) {
+export default function EditPostPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id: postId } = use(params);
+
     const router = useRouter();
     const { user } = useAuth();
-    const postId = params.id;
 
     const [initialData, setInitialData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        loadPost();
+        if (postId) {
+            loadPost();
+        }
     }, [postId]);
 
     const loadPost = async () => {
@@ -43,7 +46,7 @@ export default function EditPostPage({ params }: { params: { id: string } }) {
                 title: postData.title,
                 content: postData.content,
                 category: postData.category,
-                images: postData.images,
+                images: postData.images || [],
             });
         } catch (error) {
             console.error('게시글 로드 실패:', error);
