@@ -59,13 +59,21 @@ export default function SearchBar({
         <div className="mb-6 space-y-4">
             {/* 카테고리 */}
             <div className="flex flex-wrap gap-2">
+                <button
+                    onClick={() => onCategoryChange('전체')}
+                    className={`px-4 py-2 rounded-lg transition-colors ${category === '전체'
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                        }`}>
+                    전체
+                </button>
                 {categories.map((cat) => (
                     <button
                         key={cat.id}
                         onClick={() => onCategoryChange(cat.name)}
                         className={`px-4 py-2 rounded-lg transition-colors ${category === cat.name
-                                ? 'bg-primary-600 text-white'
-                                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
                             }`}
                     >
                         {cat.name} {cat.isPinned && '📌'} ({cat.postCount})

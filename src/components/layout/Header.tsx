@@ -36,8 +36,16 @@ export default function Header() {
 
                     {/* 데스크톱 메뉴 */}
                     <nav className="hidden md:flex items-center gap-4">
+                        {/* 관리자 페이지 이동 */}
+                        {user?.isAdmin === true ? (
+                            <Link href="/admin" className="text-gray-700 hover:text-primary-600 transition-colors">
+                                관리자 페이지
+                            </Link>
+                        ) : null}
+
                         <Link href="/" className="text-gray-700 hover:text-primary-600 transition-colors">
-                            갤러리
+                            갤러리 <pre>
+                            </pre>
                         </Link>
 
                         {user ? (
