@@ -106,10 +106,7 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
 
     return (
         <>
-            <div
-                className="card cursor-pointer hover:shadow-xl transition-all relative group"
-                onClick={handleCardClick}
-            >
+            <div className="card cursor-pointer hover:shadow-xl transition-all relative group">
                 {/* 체크박스 */}
                 {showCheckbox && (
                     <div className="absolute top-2 left-2 z-10">
@@ -132,76 +129,74 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
                     </div>
                 )}
 
-                {/* 썸네일 */}
-                <div className="relative aspect-square w-full bg-gray-100 rounded-lg overflow-hidden mb-3">
-                    {/* <Image
-                        src={post.thumbnailUrl || '/images/default-thumbnail.png'}
-                        alt={post.title}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform"
-                        loading="lazy"
-                    /> */}
-                    <Image
-                        src={post.thumbnailUrl}
-                        alt={post.title}
-                        fill
-                        className="object-cover"
-                        loading="lazy"
-                        placeholder="blur"
-                        blurDataURL="/images/default-thumbnail.png"
-                    />
-                </div>
-
-                {/* 제목 */}
-                <h3 className="font-semibold text-lg mb-2 line-clamp-2">
-                    {post.title}
-                </h3>
-
-                {/* 카테고리 */}
-                <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                        {post.category}
-                    </span>
-                </div>
-
-                {/* 작성자 및 날짜 */}
-                <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/?author=${post.authorNickname}`);
-                        }}
-                        className="hover:underline"
-                    >
-                        {post.authorNickname}
-                    </button>
-                    <span>{formatRelativeTime(post.createdAt instanceof Date ? post.createdAt : post.createdAt.toDate())}</span>
-                </div>
-
-                {/* 통계 */}
-                <div className="flex items-center justify-between border-t pt-3">
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                            <AiOutlineEye size={18} />
-                            {formatNumber(post.views)}
-                        </div>
-                        <button
-                            onClick={handleLike}
-                            className={`flex items-center gap-1 transition-colors ${liked ? 'text-red-500' : 'hover:text-red-500'
-                                }`}
-                        >
-                            {liked ? <AiFillHeart size={18} /> : <AiOutlineHeart size={18} />}
-                            {formatNumber(likeCount)}
-                        </button>
+                <div
+                    className="p-1"
+                    onClick={handleCardClick}
+                >
+                    {/* 썸네일 */}
+                    <div className="relative aspect-square w-full bg-gray-100 rounded-lg overflow-hidden mb-3">
+                        <Image
+                            src={post.thumbnailUrl}
+                            alt={post.title}
+                            fill
+                            className="object-cover"
+                            loading="lazy"
+                            placeholder="blur"
+                            blurDataURL="/images/default-thumbnail.png"
+                        />
                     </div>
 
-                    <button
-                        onClick={handleBookmark}
-                        className={`transition-colors ${bookmarked ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'
-                            }`}
-                    >
-                        {bookmarked ? <BsBookmarkFill size={18} /> : <BsBookmark size={18} />}
-                    </button>
+                    {/* 제목 */}
+                    <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+                        {post.title}
+                    </h3>
+
+                    {/* 카테고리 */}
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                            {post.category}
+                        </span>
+                    </div>
+
+                    {/* 작성자 및 날짜 */}
+                    <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/?author=${post.authorNickname}`);
+                            }}
+                            className="hover:underline"
+                        >
+                            {post.authorNickname}
+                        </button>
+                        <span>{formatRelativeTime(post.createdAt instanceof Date ? post.createdAt : post.createdAt.toDate())}</span>
+                    </div>
+
+                    {/* 통계 */}
+                    <div className="flex items-center justify-between border-t pt-3">
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <div className="flex items-center gap-1">
+                                <AiOutlineEye size={18} />
+                                {formatNumber(post.views)}
+                            </div>
+                            <button
+                                onClick={handleLike}
+                                className={`flex items-center gap-1 transition-colors ${liked ? 'text-red-500' : 'hover:text-red-500'
+                                    }`}
+                            >
+                                {liked ? <AiFillHeart size={18} /> : <AiOutlineHeart size={18} />}
+                                {formatNumber(likeCount)}
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={handleBookmark}
+                            className={`transition-colors ${bookmarked ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'
+                                }`}
+                        >
+                            {bookmarked ? <BsBookmarkFill size={18} /> : <BsBookmark size={18} />}
+                        </button>
+                    </div>
                 </div>
             </div>
 

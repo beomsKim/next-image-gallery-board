@@ -19,7 +19,7 @@ import Modal from '@/components/common/Modal';
 export default function PostList() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { user } = useAuth();  // ✅ user가 null이어도 페이지 접근 허용
+    const { user } = useAuth();  // user가 null이어도 페이지 접근 허용
 
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
@@ -31,7 +31,7 @@ export default function PostList() {
     const [sortBy, setSortBy] = useState<string>('latest');
     const [searchQuery, setSearchQuery] = useState('');
 
-    // ✅ 로그인 체크 없이 바로 로드
+    // 로그인 체크 없이 바로 로드
     useEffect(() => {
         loadPosts();
     }, [category, sortBy, searchQuery]);
@@ -109,7 +109,7 @@ export default function PostList() {
 
     const handleSelectAll = (checked: boolean) => {
         if (checked) {
-            // ✅ 본인 글 또는 관리자만 선택 가능
+            // 본인 글 또는 관리자만 선택 가능
             const selectablePosts = posts.filter(
                 (p) => p.authorId === user?.uid || user?.isAdmin
             );
@@ -199,9 +199,9 @@ export default function PostList() {
                 />
 
                 {/* 상단 액션바 */}
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between h-10 mb-4">
                     <div className="flex items-center gap-4">
-                        {/* ✅ 로그인 유저만 체크박스/삭제 버튼 표시 */}
+                        {/* 로그인 유저만 체크박스/삭제 버튼 표시 */}
                         {user && (
                             <>
                                 <label className="flex items-center gap-2 cursor-pointer">

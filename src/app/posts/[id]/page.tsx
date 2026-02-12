@@ -19,7 +19,7 @@ import Toast from '@/components/common/Toast';
 import Modal from '@/components/common/Modal';
 
 export default function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {
-    const { id: postId } = use(params);  // ✅ Promise unwrap
+    const { id: postId } = use(params);
 
     const router = useRouter();
     const { user } = useAuth();

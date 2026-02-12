@@ -85,7 +85,7 @@ export default function Modal({
                 <h3 className="text-xl font-bold mb-4">{title}</h3>
                 <div className="mb-6">{children}</div>
                 <div className="flex gap-3 justify-end">
-                    {/* ✅ cancelText 있을 때만 취소 버튼 표시 */}
+                    {/* cancelText 있을 때만 취소 버튼 표시 */}
                     {cancelText && (
                         <button onClick={onClose} className="btn-secondary">
                             {cancelText}

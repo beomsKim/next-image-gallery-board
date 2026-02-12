@@ -44,7 +44,7 @@ export default function CategorySelector({
 
             setCategories(data);
 
-            // ✅ 선택된 카테고리 없으면 "전체" 자동 선택
+            // 선택된 카테고리 없으면 "전체" 자동 선택
             if (!selectedCategory) {
                 const defaultCat = data.find((c) => c.isDefault);
                 if (defaultCat) {
