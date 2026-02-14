@@ -198,7 +198,7 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                             </div>
 
                             {/* 수정이력 */}
-                            {post.editHistory?.length > 0 && (
+                            {post.editHistory && post.editHistory.length > 0 && (
                                 <details className="mt-3 pt-3 border-t border-gray-50 group">
                                     <summary className="text-xs text-gray-300 cursor-pointer hover:text-gray-400
                                    list-none flex items-center gap-1 select-none">
