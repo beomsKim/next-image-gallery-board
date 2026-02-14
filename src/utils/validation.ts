@@ -1,6 +1,6 @@
 export const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return regex.test(email);
 };
 
 export const validatePassword = (password: string): boolean => {
@@ -12,7 +12,7 @@ export const validateNickname = (nickname: string): boolean => {
 };
 
 export const validateTitle = (title: string): boolean => {
-    return title.trim().length > 0 && title.length <= 50;
+    return title.trim().length >= 1 && title.trim().length <= 50;
 };
 
 export const validateContent = (content: string): boolean => {
@@ -20,18 +20,9 @@ export const validateContent = (content: string): boolean => {
 };
 
 export const validateCategory = (category: string): boolean => {
-    return category.trim().length > 0;
+    return category.trim().length >= 1;
 };
 
 export const normalizeCategory = (category: string): string => {
     return category.trim().toLowerCase().replace(/\s+/g, '');
-};
-
-export const validateImageSize = (file: File): boolean => {
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    return file.size <= maxSize;
-};
-
-export const validateImageCount = (count: number): boolean => {
-    return count >= 1 && count <= 5;
 };

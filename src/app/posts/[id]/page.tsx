@@ -3,10 +3,12 @@
 import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { doc, getDoc, updateDoc, deleteDoc, increment } from 'firebase/firestore';
+import {
+    doc, getDoc, updateDoc, deleteDoc,
+    increment, arrayUnion, arrayRemove
+} from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
-import { storage } from '@/lib/firebase';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Post } from '@/types/post';
 import { formatDateTime, formatNumber } from '@/utils/format';
@@ -20,7 +22,6 @@ import Modal from '@/components/common/Modal';
 
 export default function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id: postId } = use(params);
-
     const router = useRouter();
     const { user } = useAuth();
 
@@ -28,102 +29,97 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
     const [loading, setLoading] = useState(true);
     const [liked, setLiked] = useState(false);
     const [bookmarked, setBookmarked] = useState(false);
+    const [likeCount, setLikeCount] = useState(0);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-    useEffect(() => {
-        loadPost();
-    }, [postId]);
+    useEffect(() => { loadPost(); }, [postId]);
 
     useEffect(() => {
-        // 조회수 증가 (24시간에 1회만)
+        if (user && post) {
+            setLiked(user.likedPosts?.includes(postId) || false);
+            setBookmarked(user.bookmarkedPosts?.includes(postId) || false);
+        }
+    }, [user, postId, post]);
+
+    useEffect(() => {
         if (post && !hasViewedPost(postId)) {
-            incrementViews();
+            updateDoc(doc(db, 'posts', postId), { views: increment(1) }).catch(console.error);
             markPostAsViewed(postId);
         }
-    }, [post, postId]);
+    }, [post]);
 
     const loadPost = async () => {
         try {
             const postDoc = await getDoc(doc(db, 'posts', postId));
-
-            if (!postDoc.exists()) {
-                setToast({ message: '게시글을 찾을 수 없습니다.', type: 'error' });
-                router.push('/');
-                return;
-            }
-
-            const postData = {
-                id: postDoc.id,
-                ...postDoc.data(),
-            } as Post;
-
-            setPost(postData);
-
+            if (!postDoc.exists()) { router.push('/'); return; }
+            const data = { id: postDoc.id, ...postDoc.data() } as Post;
+            setPost(data);
+            setLikeCount(data.likes || 0);
             if (user) {
                 setLiked(user.likedPosts?.includes(postId) || false);
                 setBookmarked(user.bookmarkedPosts?.includes(postId) || false);
             }
-        } catch (error) {
-            console.error('게시글 로드 실패:', error);
-            setToast({ message: '게시글을 불러오는데 실패했습니다.', type: 'error' });
+        } catch (e) {
+            console.error('게시글 로드 실패:', e);
         } finally {
             setLoading(false);
         }
     };
 
-    const incrementViews = async () => {
+    const handleLike = async () => {
+        if (!user) { setToast({ message: '로그인이 필요합니다.', type: 'error' }); return; }
+        const newLiked = !liked;
+        setLiked(newLiked);
+        setLikeCount((p) => newLiked ? p + 1 : p - 1);
         try {
-            await updateDoc(doc(db, 'posts', postId), {
-                views: increment(1),
-            });
-        } catch (error) {
-            console.error('조회수 증가 실패:', error);
+            if (newLiked) {
+                await updateDoc(doc(db, 'users', user.uid), { likedPosts: arrayUnion(postId) });
+                await updateDoc(doc(db, 'posts', postId), { likes: increment(1) });
+                user.likedPosts = [...(user.likedPosts || []), postId];
+            } else {
+                await updateDoc(doc(db, 'users', user.uid), { likedPosts: arrayRemove(postId) });
+                await updateDoc(doc(db, 'posts', postId), { likes: increment(-1) });
+                user.likedPosts = (user.likedPosts || []).filter((id) => id !== postId);
+            }
+        } catch {
+            setLiked(!newLiked);
+            setLikeCount((p) => newLiked ? p - 1 : p + 1);
+            setToast({ message: '오류가 발생했습니다.', type: 'error' });
         }
     };
 
-    const handleEdit = () => {
-        router.push(`/posts/edit/${postId}`);
+    const handleBookmark = async () => {
+        if (!user) { setToast({ message: '로그인이 필요합니다.', type: 'error' }); return; }
+        const newBookmarked = !bookmarked;
+        setBookmarked(newBookmarked);
+        try {
+            if (newBookmarked) {
+                await updateDoc(doc(db, 'users', user.uid), { bookmarkedPosts: arrayUnion(postId) });
+                user.bookmarkedPosts = [...(user.bookmarkedPosts || []), postId];
+                setToast({ message: '북마크에 추가되었습니다.', type: 'success' });
+            } else {
+                await updateDoc(doc(db, 'users', user.uid), { bookmarkedPosts: arrayRemove(postId) });
+                user.bookmarkedPosts = (user.bookmarkedPosts || []).filter((id) => id !== postId);
+                setToast({ message: '북마크가 해제되었습니다.', type: 'success' });
+            }
+        } catch {
+            setBookmarked(!newBookmarked);
+            setToast({ message: '오류가 발생했습니다.', type: 'error' });
+        }
     };
 
-    // 게시글 삭제 함수
     const handleDelete = async () => {
         try {
             setLoading(true);
-
-            // 1. Storage 이미지 삭제
-            if (post?.images && post.images.length > 0) {
-                const deleteImagePromises = post.images.map(async (imageUrl) => {
-                    try {
-                        const imageRef = ref(storage, imageUrl);
-                        await deleteObject(imageRef);
-                    } catch (err) {
-                        console.warn('이미지 삭제 실패 (무시):', err);
-                        // 이미지 삭제 실패해도 게시글 삭제는 진행
-                    }
-                });
-                await Promise.all(deleteImagePromises);
+            if (post?.images?.length) {
+                await Promise.all(post.images.map(async (url) => {
+                    try { await deleteObject(ref(storage, url)); } catch { }
+                }));
             }
-
-            // 2. 카테고리 postCount 감소
-            if (post?.category) {
-                const categoryId = post.category.toLowerCase().replace(/\s+/g, '');
-                const categoryRef = doc(db, 'categories', categoryId);
-                const categoryDoc = await getDoc(categoryRef);
-                if (categoryDoc.exists() && categoryDoc.data().postCount > 0) {
-                    await updateDoc(categoryRef, {
-                        postCount: categoryDoc.data().postCount - 1,
-                    });
-                }
-            }
-
-            // 3. 게시글 삭제
             await deleteDoc(doc(db, 'posts', postId));
-
-            setToast({ message: '게시글이 삭제되었습니다.', type: 'success' });
-            setTimeout(() => router.push('/'), 1000);
-        } catch (error) {
-            console.error('삭제 실패:', error);
+            router.push('/');
+        } catch {
             setToast({ message: '삭제에 실패했습니다.', type: 'error' });
         } finally {
             setLoading(false);
@@ -133,86 +129,101 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
 
     const canEdit = user && (user.uid === post?.authorId || user.isAdmin);
 
-    if (loading) {
-        return <Loading message="게시글을 불러오는 중..." />;
-    }
+    if (loading) return <Loading message="게시글을 불러오는 중..." />;
+    if (!post) return null;
 
-    if (!post) {
-        return null;
-    }
+    const createdAt = post.createdAt instanceof Date ? post.createdAt : post.createdAt.toDate();
 
     return (
         <>
-            <main className="min-h-screen bg-gray-50 py-8">
-                <div className="max-w-4xl mx-auto p-4">
-                    <div className="card">
-                        {/* 헤더 */}
-                        <div className="border-b pb-4 mb-6">
-                            <div className="flex items-start justify-between mb-4">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-sm bg-gray-100 px-3 py-1 rounded">
-                                            {post.category}
-                                        </span>
-                                        {post.isPinned && (
-                                            <span className="text-sm bg-primary-100 text-primary-700 px-3 py-1 rounded">
-                                                📌 고정
-                                            </span>
-                                        )}
-                                    </div>
-                                    <h1 className="text-3xl font-bold mb-4">{post.title}</h1>
-                                </div>
+            <main className="min-h-screen bg-slate-50 pb-24 md:pb-8">
+                {/* 헤더 */}
+                <div className="sticky top-14 md:top-16 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-100 px-4 py-3">
+                    <div className="max-w-4xl mx-auto flex items-center gap-3">
+                        <button onClick={() => router.back()}
+                            className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100
+                       active:scale-95 transition-all text-gray-600">
+                            ←
+                        </button>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 truncate text-sm">{post.title}</p>
+                            <p className="text-xs text-gray-400">{post.authorNickname}</p>
+                        </div>
+                        {canEdit && (
+                            <div className="flex gap-1">
+                                <button onClick={() => router.push(`/posts/edit/${postId}`)}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100
+                           active:scale-95 transition-all text-gray-600 text-sm">
+                                    ✏️
+                                </button>
+                                <button onClick={() => setShowDeleteModal(true)}
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-red-50
+                           active:scale-95 transition-all text-red-500 text-sm">
+                                    🗑
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
 
-                                {canEdit && (
-                                    <div className="flex gap-2">
-                                        <button onClick={handleEdit} className="btn-secondary">
-                                            <FiEdit size={18} />
-                                        </button>
-                                        <button
-                                            onClick={() => setShowDeleteModal(true)}
-                                            className="btn-secondary text-red-600"
-                                        >
-                                            <FiTrash2 size={18} />
-                                        </button>
-                                    </div>
+                <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4">
+                    {/* 카드 */}
+                    <div className="bg-white rounded-3xl overflow-hidden shadow-card border border-gray-100 mb-4">
+                        {/* 메타 정보 */}
+                        <div className="px-5 pt-5 pb-4">
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="badge-primary">{post.category}</span>
+                                {post.isPinned && (
+                                    <span className="badge bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700">
+                                        📌 고정
+                                    </span>
                                 )}
                             </div>
-
-                            <div className="flex items-center justify-between text-sm text-gray-600">
-                                <div className="flex items-center gap-4">
-                                    <span>{post.authorNickname}</span>
-                                    <span>{formatDateTime(post.createdAt instanceof Date ? post.createdAt : post.createdAt.toDate())}</span>
-                                    {post.updatedAt && post.updatedAt !== post.createdAt && (
-                                        <span className="text-gray-400">
-                                            (수정: {formatDateTime(post.updatedAt instanceof Date ? post.updatedAt : post.updatedAt.toDate())})
-                                        </span>
-                                    )}
+                            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-snug mb-3">{post.title}</h1>
+                            <div className="flex items-center justify-between text-sm text-gray-400">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full
+                               flex items-center justify-center">
+                                        <span className="text-white text-xs font-bold">{post.authorNickname.charAt(0)}</span>
+                                    </div>
+                                    <span className="font-medium text-gray-600">{post.authorNickname}</span>
                                 </div>
-
-                                <div className="flex items-center gap-4">
-                                    <div className="flex items-center gap-1">
-                                        <AiOutlineEye size={18} />
-                                        {formatNumber(post.views)}
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <AiOutlineHeart size={18} />
-                                        {formatNumber(post.likes)}
-                                    </div>
+                                <div className="flex items-center gap-3">
+                                    <span>{formatDateTime(createdAt)}</span>
+                                    <span className="flex items-center gap-1">
+                                        <AiOutlineEye size={14} />
+                                        {formatNumber(post.views || 0)}
+                                    </span>
                                 </div>
                             </div>
+
+                            {/* 수정이력 */}
+                            {post.editHistory?.length > 0 && (
+                                <details className="mt-3 pt-3 border-t border-gray-50 group">
+                                    <summary className="text-xs text-gray-300 cursor-pointer hover:text-gray-400
+                                   list-none flex items-center gap-1 select-none">
+                                        <span className="group-open:rotate-90 transition-transform inline-block">▶</span>
+                                        수정됨 ({post.editHistory.length}회)
+                                    </summary>
+                                    <div className="mt-2 space-y-1 pl-3">
+                                        {post.editHistory.map((h: any, i: number) => (
+                                            <p key={i} className="text-xs text-gray-300">
+                                                {i + 1}차 · {formatDateTime(h.editedAt instanceof Date ? h.editedAt : h.editedAt.toDate())}
+                                            </p>
+                                        ))}
+                                    </div>
+                                </details>
+                            )}
                         </div>
 
-                        {/* 이미지 갤러리 */}
-                        {post.images && post.images.length > 0 && (
-                            <div className="mb-6">
-                                {post.images.map((imageUrl, index) => (
-                                    <div key={index} className="mb-4 relative aspect-video w-full">
-                                        <Image
-                                            src={imageUrl}
-                                            alt={`${post.title} - ${index + 1}`}
-                                            fill
-                                            className="object-contain rounded-lg"
-                                        />
+                        {/* 이미지 */}
+                        {post.images?.length > 0 && (
+                            <div className="border-t border-gray-50">
+                                {post.images.map((url, i) => (
+                                    <div key={i} className="border-b border-gray-50 last:border-b-0">
+                                        <Image src={url} alt={`${post.title} - ${i + 1}`}
+                                            width={800} height={600}
+                                            className="w-full h-auto" />
                                     </div>
                                 ))}
                             </div>
@@ -220,46 +231,46 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
 
                         {/* 내용 */}
                         {post.content && (
-                            <div className="mb-6 whitespace-pre-wrap text-gray-700">
+                            <div className="px-5 py-4 text-gray-700 leading-relaxed whitespace-pre-wrap border-t border-gray-50">
                                 {post.content}
                             </div>
                         )}
 
-                        {/* 액션 버튼 */}
-                        <div className="flex items-center justify-center gap-4 border-t pt-6">
-                            <button className="flex items-center gap-2 px-6 py-3 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
-                                {liked ? <AiFillHeart size={24} className="text-red-500" /> : <AiOutlineHeart size={24} />}
-                                <span>{formatNumber(post.likes)}</span>
+                        {/* 좋아요/북마크 */}
+                        <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
+                            <button onClick={handleLike}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl
+                         font-semibold text-sm transition-all active:scale-[0.97]
+                         ${liked
+                                        ? 'bg-red-50 text-red-500 border-2 border-red-200'
+                                        : 'bg-gray-50 text-gray-500 border-2 border-transparent hover:bg-red-50'}`}>
+                                {liked ? <AiFillHeart size={20} /> : <AiOutlineHeart size={20} />}
+                                {formatNumber(likeCount)}
                             </button>
-
-                            <button className="flex items-center gap-2 px-6 py-3 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
-                                {bookmarked ? <BsBookmarkFill size={20} className="text-primary-600" /> : <BsBookmark size={20} />}
-                                북마크
+                            <button onClick={handleBookmark}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl
+                         font-semibold text-sm transition-all active:scale-[0.97]
+                         ${bookmarked
+                                        ? 'bg-indigo-50 text-indigo-600 border-2 border-indigo-200'
+                                        : 'bg-gray-50 text-gray-500 border-2 border-transparent hover:bg-indigo-50'}`}>
+                                {bookmarked ? <BsBookmarkFill size={17} /> : <BsBookmark size={17} />}
+                                {bookmarked ? '저장됨' : '저장'}
                             </button>
                         </div>
                     </div>
 
-                    {/* 목록으로 버튼 */}
-                    <div className="mt-6 text-center">
-                        <button onClick={() => router.push('/')} className="btn-secondary">
-                            목록으로
-                        </button>
-                    </div>
+                    <button onClick={() => router.back()}
+                        className="w-full btn-secondary py-3.5">
+                        ← 목록으로
+                    </button>
                 </div>
             </main>
 
             {toast && <Toast {...toast} onClose={() => setToast(null)} />}
-
-            {/* 삭제 확인 모달 */}
-            <Modal
-                isOpen={showDeleteModal}
-                onClose={() => setShowDeleteModal(false)}
-                title="게시글 삭제"
-                confirmText="삭제"
-                cancelText="취소"
-                onConfirm={handleDelete}
-            >
-                <p className="text-gray-700">정말 삭제하시겠습니까?</p>
+            <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)}
+                title="게시글 삭제" confirmText="삭제" cancelText="취소" onConfirm={handleDelete}
+                confirmClassName="btn-primary bg-red-600 hover:bg-red-700">
+                <p className="text-gray-600">삭제하면 복구할 수 없습니다. 정말 삭제하시겠습니까?</p>
             </Modal>
         </>
     );

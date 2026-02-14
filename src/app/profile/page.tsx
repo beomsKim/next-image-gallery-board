@@ -9,231 +9,150 @@ import Loading from '@/components/common/Loading';
 import Toast from '@/components/common/Toast';
 import Modal from '@/components/common/Modal';
 
+const WITHDRAWAL_REASONS = [
+    '더 이상 서비스를 이용하지 않아서',
+    '개인정보 보호를 위해',
+    '다른 계정으로 재가입 예정',
+    '서비스가 불편해서',
+    '콘텐츠가 마음에 들지 않아서',
+    '기타',
+];
+
 export default function ProfilePage() {
     const router = useRouter();
-    const { user, loading: authLoading, updateUserProfile, deleteAccount } = useAuth();
-
+    const { user, updateUserProfile, deleteAccount, loading: authLoading } = useAuth();
     const [nickname, setNickname] = useState('');
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [withdrawalReasons, setWithdrawalReasons] = useState<string[]>([]);
 
     const { isChecking, isAvailable, message: nicknameMessage } = useNicknameCheck(nickname, user?.nickname);
 
     useEffect(() => {
-        if (!authLoading && !user) {
-            router.push('/login');
-        } else if (user) {
-            setNickname(user.nickname);
-            setEmail(user.email);
-        }
-    }, [authLoading, user, router]);
+        if (!authLoading && !user) router.push('/login');
+        if (user) { setNickname(user.nickname); setEmail(user.email); }
+    }, [user, authLoading, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
         if (!user) return;
-
-        // 금지 닉네임 검사
-        if (nickname !== user.nickname) {
-            const { forbiddenNicknames } = await getFilterWords();
-            if (isForbiddenNickname(nickname, forbiddenNicknames)) {
-                setToast({ message: '사용할 수 없는 닉네임입니다.', type: 'error' });
-                return;
-            }
-        }
-
-        // 변경사항 확인
-        if (nickname === user.nickname && email === user.email) {
-            setToast({ message: '변경된 정보가 없습니다.', type: 'error' });
+        if (nickname !== user.nickname && isAvailable === false) {
+            setToast({ message: '이미 사용 중인 닉네임입니다.', type: 'error' });
             return;
         }
-
-        // 닉네임 변경 시 유효성 검사
-        if (nickname !== user.nickname && !isAvailable) {
-            setToast({ message: '사용할 수 없는 닉네임입니다.', type: 'error' });
-            return;
-        }
-
         setLoading(true);
-
         try {
+            if (nickname !== user.nickname) {
+                const { forbiddenNicknames } = await getFilterWords();
+                if (isForbiddenNickname(nickname, forbiddenNicknames)) {
+                    setToast({ message: '사용할 수 없는 닉네임입니다.', type: 'error' });
+                    setLoading(false);
+                    return;
+                }
+            }
             await updateUserProfile({
                 nickname: nickname !== user.nickname ? nickname : undefined,
                 email: email !== user.email ? email : undefined,
             });
-
             setToast({ message: '프로필이 수정되었습니다.', type: 'success' });
-
-            // 이메일 변경 시 알림
-            if (email !== user.email) {
-                setToast({
-                    message: '이메일 변경을 위한 인증 메일이 발송되었습니다.',
-                    type: 'success',
-                });
-            }
         } catch (error: any) {
-            setToast({ message: error.message, type: 'error' });
+            if (error.message?.includes('|info')) {
+                setToast({ message: error.message.replace('|info', ''), type: 'success' });
+            } else {
+                setToast({ message: error.message, type: 'error' });
+            }
         } finally {
             setLoading(false);
         }
     };
 
     const handleDeleteAccount = async () => {
-        setLoading(true);
-
         try {
-            await deleteAccount();
-            setToast({ message: '회원 탈퇴가 완료되었습니다.', type: 'success' });
-            setTimeout(() => router.push('/'), 1000);
+            await deleteAccount(withdrawalReasons);
+            router.push('/');
         } catch (error: any) {
             setToast({ message: error.message, type: 'error' });
         } finally {
-            setLoading(false);
             setShowDeleteModal(false);
         }
     };
 
-    if (authLoading) {
-        return <Loading message="로딩 중..." />;
-    }
+    const toggleReason = (reason: string) => {
+        setWithdrawalReasons((prev) =>
+            prev.includes(reason) ? prev.filter((r) => r !== reason) : [...prev, reason]
+        );
+    };
 
-    if (!user) {
-        return null;
-    }
+    if (authLoading || !user) return <Loading message="로딩 중..." />;
 
     return (
         <>
             <main className="min-h-screen bg-gray-50 py-8">
-                <div className="max-w-2xl mx-auto p-4">
-                    <form onSubmit={handleSubmit} className="card">
-                        <h2 className="text-2xl font-bold mb-6">프로필 수정</h2>
-
-                        {/* 닉네임 */}
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium mb-2">닉네임</label>
-                            <input
-                                type="text"
-                                value={nickname}
-                                onChange={(e) => setNickname(e.target.value)}
-                                className="input-field"
-                                minLength={2}
-                                maxLength={20}
-                                required
-                            />
-                            {nickname !== user.nickname && (
-                                <p
-                                    className={`text-sm mt-1 ${isChecking
-                                        ? 'text-gray-500'
-                                        : isAvailable
-                                            ? 'text-green-600'
-                                            : 'text-red-600'
-                                        }`}
-                                >
-                                    {isChecking ? '확인 중...' : nicknameMessage}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* 이메일 */}
-                        <div className="mb-6">
-                            <label className="block text-sm font-medium mb-2">이메일</label>
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="input-field"
-                                required
-                            />
-                            {email !== user.email && (
-                                <p className="text-sm text-orange-600 mt-1">
-                                    이메일 변경 시 재인증이 필요합니다.
-                                </p>
-                            )}
-                        </div>
-
-                        {/* 버튼 */}
-                        <div className="flex gap-4 mb-6">
-                            <button
-                                type="submit"
-                                disabled={loading || (nickname !== user.nickname && !isAvailable)}
-                                className="flex-1 btn-primary"
-                            >
+                <div className="max-w-lg mx-auto p-4">
+                    <div className="card">
+                        <h1 className="text-2xl font-bold mb-6">프로필 수정</h1>
+                        <form onSubmit={handleSubmit} className="space-y-5">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">닉네임</label>
+                                <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)}
+                                    className="input-field" />
+                                {nickname !== user.nickname && nicknameMessage && (
+                                    <p className={`text-xs mt-1 ${isAvailable ? 'text-green-600' : 'text-red-500'}`}>
+                                        {isChecking ? '확인 중...' : nicknameMessage}
+                                    </p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                                    className="input-field" />
+                                {email !== user.email && (
+                                    <p className="text-xs mt-1 text-amber-600">
+                                        변경 시 새 이메일로 인증 링크가 발송됩니다.
+                                    </p>
+                                )}
+                            </div>
+                            <button type="submit" disabled={loading} className="w-full btn-primary py-3">
                                 {loading ? '저장 중...' : '저장'}
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => router.back()}
-                                disabled={loading}
-                                className="flex-1 btn-secondary"
-                            >
-                                취소
-                            </button>
-                        </div>
+                        </form>
 
-                        {/* 구분선 */}
-                        <div className="border-t pt-6">
-                            <h3 className="text-lg font-semibold text-red-600 mb-4">위험 구역</h3>
-                            <button
-                                type="button"
-                                onClick={() => setShowDeleteModal(true)}
-                                disabled={loading}
-                                className="w-full btn-secondary text-red-600 border-red-600 hover:bg-red-50"
-                            >
-                                회원 탈퇴
+                        <hr className="my-8" />
+
+                        <div>
+                            <h2 className="text-lg font-semibold text-red-600 mb-2">회원 탈퇴</h2>
+                            <p className="text-sm text-gray-500 mb-4">
+                                탈퇴 시 작성하신 게시글의 작성자는 "탈퇴한 사용자"로 변경됩니다.
+                            </p>
+                            <button onClick={() => setShowDeleteModal(true)}
+                                className="text-sm text-red-500 hover:text-red-700 underline">
+                                회원 탈퇴하기
                             </button>
                         </div>
-                    </form>
+                    </div>
                 </div>
             </main>
 
-            {loading && <Loading message="처리 중..." />}
             {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 
-            {/* 탈퇴 확인 모달 */}
-            <Modal
-                isOpen={showDeleteModal}
-                onClose={() => setShowDeleteModal(false)}
-                title="회원 탈퇴"
-                confirmText="탈퇴"
-                cancelText="취소"
-                onConfirm={handleDeleteAccount}
-            >
-                <div className="text-gray-700">
-                    <p className="font-semibold mb-4">정말 탈퇴하시겠습니까?</p>
-                    <p className="text-sm mb-4">
-                        탈퇴 시 다음 사항이 적용됩니다:
-                    </p>
-                    <ul className="list-disc list-inside text-sm space-y-2 mb-4">
-                        <li>계정 정보가 삭제됩니다</li>
-                        <li>작성한 게시글은 "탈퇴한 사용자"로 표시됩니다</li>
-                        <li>좋아요 및 북마크 정보가 삭제됩니다</li>
-                        <li>이 작업은 되돌릴 수 없습니다</li>
-                    </ul>
-
-                    {/* 탈퇴 사유 (선택) */}
-                    <div className="border-t pt-4">
-                        <p className="text-sm font-medium mb-2">탈퇴 사유 (선택)</p>
-                        <div className="space-y-2 text-sm">
-                            <label className="flex items-center gap-2">
-                                <input type="checkbox" className="rounded" />
-                                자주 사용하지 않음
+            <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)}
+                title="회원 탈퇴" confirmText="탈퇴하기" cancelText="취소" onConfirm={handleDeleteAccount}
+                confirmClassName="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                <div className="space-y-3">
+                    <p className="text-gray-700 font-medium">탈퇴 사유를 선택해주세요. (선택)</p>
+                    <div className="space-y-2">
+                        {WITHDRAWAL_REASONS.map((reason) => (
+                            <label key={reason} className="flex items-center gap-3 cursor-pointer group">
+                                <input type="checkbox" checked={withdrawalReasons.includes(reason)}
+                                    onChange={() => toggleReason(reason)}
+                                    className="w-4 h-4 accent-red-500" />
+                                <span className="text-sm text-gray-600 group-hover:text-gray-900">{reason}</span>
                             </label>
-                            <label className="flex items-center gap-2">
-                                <input type="checkbox" className="rounded" />
-                                개인정보 보호
-                            </label>
-                            <label className="flex items-center gap-2">
-                                <input type="checkbox" className="rounded" />
-                                서비스 불만족
-                            </label>
-                            <label className="flex items-center gap-2">
-                                <input type="checkbox" className="rounded" />
-                                기타
-                            </label>
-                        </div>
+                        ))}
                     </div>
+                    <p className="text-xs text-red-500 pt-2">⚠️ 탈퇴 후 계정 복구는 불가능합니다.</p>
                 </div>
             </Modal>
         </>

@@ -2,17 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, addDoc, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import {
+    collection, addDoc, updateDoc, doc, getDoc,
+    serverTimestamp, arrayUnion
+} from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { useImageUpload } from '@/hooks/useImageUpload';
-import { validateTitle, validateContent, validateCategory, normalizeCategory } from '@/utils/validation';
 import { getFilterWords, containsBadWord } from '@/utils/filterWords';
+import { validateTitle } from '@/utils/validation';
 import ImageUploader from './ImageUploader';
 import CategorySelector from './CategorySelector';
-import Loading from '@/components/common/Loading';
 import Toast from '@/components/common/Toast';
 import Modal from '@/components/common/Modal';
+import Loading from '@/components/common/Loading';
 
 interface PostFormProps {
     postId?: string;
@@ -27,319 +30,170 @@ interface PostFormProps {
 export default function PostForm({ postId, initialData }: PostFormProps) {
     const router = useRouter();
     const { user } = useAuth();
-    const {
-        images,
-        uploading,
-        uploadProgress,
-        addImages,
-        removeImage,
-        reorderImages,
-        uploadImages,
-        deleteImages,
-        reset,
-    } = useImageUpload();
+    const { images, uploading, uploadProgress, addImages, removeImage, reorderImages, uploadImages, reset } = useImageUpload();
 
-    const [formData, setFormData] = useState({
-        title: initialData?.title || '',
-        content: initialData?.content || '',
-        category: initialData?.category || '',
-    });
-
-    const [errors, setErrors] = useState({
-        title: '',
-        content: '',
-        category: '',
-        images: '',
-    });
-
-    const [loading, setLoading] = useState(false);
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [title, setTitle] = useState(initialData?.title || '');
+    const [content, setContent] = useState(initialData?.content || '');
+    const [category, setCategory] = useState(initialData?.category || '전체');
+    const [submitting, setSubmitting] = useState(false);
     const [showSuccessModal, setShowSuccessModal] = useState(false);
-    const [createdPostId, setCreatedPostId] = useState<string>('');
+    const [savedPostId, setSavedPostId] = useState('');
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
-
-        // 실시간 유효성 검사
-        if (name === 'title') {
-            setErrors((prev) => ({
-                ...prev,
-                title: validateTitle(value) ? '' : '제목은 1자 이상 50자 이하여야 합니다.',
-            }));
-        } else if (name === 'content') {
-            setErrors((prev) => ({
-                ...prev,
-                content: validateContent(value) ? '' : '내용은 500자 이하여야 합니다.',
-            }));
-        }
-    };
-
-    const handleCategorySelect = (category: string) => {
-        setFormData((prev) => ({ ...prev, category }));
-        setErrors((prev) => ({ ...prev, category: '' }));
-    };
-
-    const handleAddImages = async (files: FileList) => {
-        try {
-            await addImages(files);
-            setErrors((prev) => ({ ...prev, images: '' }));
-        } catch (error: any) {
-            setToast({ message: error.message, type: 'error' });
-        }
-    };
+    useEffect(() => {
+        if (!user) router.push('/login');
+    }, [user, router]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!user) return;
 
-        // 유효성 검사
-        if (!validateTitle(formData.title)) {
-            setToast({ message: '제목을 확인해주세요.', type: 'error' });
+        if (!validateTitle(title)) {
+            setToast({ message: '제목을 1자 이상 50자 이하로 입력해주세요.', type: 'error' });
             return;
         }
-
-        if (!validateContent(formData.content)) {
-            setToast({ message: '내용을 확인해주세요.', type: 'error' });
-            return;
-        }
-
-        if (!validateCategory(formData.category)) {
-            setToast({ message: '카테고리를 선택해주세요.', type: 'error' });
-            return;
-        }
-
         if (images.length === 0 && !initialData) {
-            setToast({ message: '이미지를 최소 1장 이상 업로드해주세요.', type: 'error' });
-            return;
-        }
-
-        if (!user) {
-            setToast({ message: '로그인이 필요합니다.', type: 'error' });
+            setToast({ message: '이미지를 1장 이상 업로드해주세요.', type: 'error' });
             return;
         }
 
         // 비속어 검사
         const { badWords } = await getFilterWords();
-
-        if (containsBadWord(formData.title, badWords)) {
+        if (containsBadWord(title, badWords)) {
             setToast({ message: '제목에 사용할 수 없는 단어가 포함되어 있습니다.', type: 'error' });
             return;
         }
-
-        if (formData.content && containsBadWord(formData.content, badWords)) {
+        if (content && containsBadWord(content, badWords)) {
             setToast({ message: '내용에 사용할 수 없는 단어가 포함되어 있습니다.', type: 'error' });
             return;
         }
 
-        if (containsBadWord(formData.category, badWords)) {
-            setToast({ message: '카테고리에 사용할 수 없는 단어가 포함되어 있습니다.', type: 'error' });
-            return;
-        }
-
-        setLoading(true);
-
+        setSubmitting(true);
         try {
-            let imageUrls: string[] = initialData?.images || [];
+            let imageUrls = initialData?.images || [];
+            let thumbnailUrl = initialData?.images?.[0] || '';
 
-            // 새 이미지가 있으면 업로드
             if (images.length > 0) {
-                const tempPostId = postId || `temp_${Date.now()}`;
-                imageUrls = await uploadImages(tempPostId);
+                const tempId = postId || `temp_${Date.now()}`;
+                imageUrls = await uploadImages(tempId);
+                thumbnailUrl = imageUrls[0];
             }
-
-            // 카테고리 정규화
-            const normalizedCategory = normalizeCategory(formData.category);
-
-            // 게시글 데이터
-            const postData = {
-                title: formData.title.trim(),
-                content: formData.content.trim(),
-                category: formData.category,
-                images: imageUrls,
-                thumbnailUrl: imageUrls[0] || '/images/default-thumbnail.png',
-                authorId: user.uid,
-                authorNickname: user.nickname,
-                views: 0,
-                likes: 0,
-                isPinned: false,
-                updatedAt: new Date(),
-            };
 
             if (postId) {
                 // 수정
-                await updateDoc(doc(db, 'posts', postId), postData);
-            } else {
-                // 새 글 작성
-                const docRef = await addDoc(collection(db, 'posts'), {
-                    ...postData,
-                    createdAt: new Date(),
+                const existingDoc = await getDoc(doc(db, 'posts', postId));
+                const existingHistory = existingDoc.data()?.editHistory || [];
+                await updateDoc(doc(db, 'posts', postId), {
+                    title: title.trim(),
+                    content: content.trim(),
+                    category,
+                    images: imageUrls,
+                    thumbnailUrl,
+                    updatedAt: new Date(),
+                    editHistory: [...existingHistory, { editedAt: new Date() }],
                 });
-                setCreatedPostId(docRef.id);
+                setSavedPostId(postId);
+            } else {
+                // 신규
+                const docRef = await addDoc(collection(db, 'posts'), {
+                    title: title.trim(),
+                    content: content.trim(),
+                    category,
+                    images: imageUrls,
+                    thumbnailUrl,
+                    authorId: user.uid,
+                    authorNickname: user.nickname,
+                    views: 0,
+                    likes: 0,
+                    isPinned: false,
+                    editHistory: [],
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+                setSavedPostId(docRef.id);
             }
-
-            // 카테고리 업데이트 또는 생성
-            await updateOrCreateCategory(formData.category, normalizedCategory);
 
             setShowSuccessModal(true);
-        } catch (error: any) {
-            console.error('게시글 저장 실패:', error);
-            setToast({ message: error.message || '게시글 저장에 실패했습니다.', type: 'error' });
+        } catch (e) {
+            console.error('저장 실패:', e);
+            setToast({ message: '저장에 실패했습니다.', type: 'error' });
         } finally {
-            setLoading(false);
-        }
-    };
-
-    const updateOrCreateCategory = async (categoryName: string, normalizedName: string) => {
-        try {
-            const categoryRef = doc(db, 'categories', normalizedName);
-            const categoryDoc = await getDoc(categoryRef);
-
-            if (categoryDoc.exists()) {
-                // 기존 카테고리 업데이트
-                await updateDoc(categoryRef, {
-                    postCount: categoryDoc.data().postCount + 1,
-                });
-            } else {
-                // 새 카테고리 생성
-                await setDoc(categoryRef, {
-                    id: normalizedName,
-                    name: categoryName,
-                    isDefault: false,
-                    isPinned: false,
-                    postCount: 1,
-                    createdAt: new Date(),
-                });
-            }
-        } catch (error) {
-            console.error('카테고리 업데이트 실패:', error);
+            setSubmitting(false);
         }
     };
 
     const handleSuccessConfirm = () => {
         setShowSuccessModal(false);
-        router.push(`/posts/${postId || createdPostId}`);
+        router.push(savedPostId ? `/posts/${savedPostId}` : '/');
     };
+
+    if (!user) return null;
 
     return (
         <>
-            <form onSubmit={handleSubmit} className="max-w-4xl mx-auto p-4">
+            <div className="max-w-4xl mx-auto p-4">
                 <div className="card">
-                    <h2 className="text-2xl font-bold mb-6">
-                        {postId ? '게시글 수정' : '글쓰기'}
-                    </h2>
+                    <h1 className="text-2xl font-bold mb-6">{postId ? '게시글 수정' : '글쓰기'}</h1>
 
-                    {/* 카테고리 */}
-                    <div className="mb-6">
-                        <CategorySelector
-                            selectedCategory={formData.category}
-                            onSelectCategory={handleCategorySelect}
-                        />
-                        {errors.category && (
-                            <p className="text-red-500 text-sm mt-1">{errors.category}</p>
-                        )}
-                    </div>
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* 카테고리 */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">카테고리</label>
+                            <CategorySelector selectedCategory={category} onSelectCategory={setCategory} />
+                        </div>
 
-                    {/* 제목 */}
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium mb-2">
-                            제목 <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            name="title"
-                            value={formData.title}
-                            onChange={handleChange}
-                            className="input-field"
-                            placeholder="제목을 입력하세요 (최대 50자)"
-                            maxLength={50}
-                            required
-                        />
-                        <p className="text-sm text-gray-500 mt-1">
-                            {formData.title.length}/50
-                        </p>
-                        {errors.title && (
-                            <p className="text-red-500 text-sm mt-1">{errors.title}</p>
-                        )}
-                    </div>
+                        {/* 제목 */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                제목 <span className="text-red-500">*</span>
+                            </label>
+                            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
+                                className="input-field" placeholder="제목을 입력하세요 (최대 50자)" maxLength={50} />
+                            <p className="text-xs text-gray-400 mt-1 text-right">{title.length}/50</p>
+                        </div>
 
-                    {/* 이미지 업로드 */}
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium mb-2">
-                            이미지 {!postId && <span className="text-red-500">*</span>}
-                        </label>
-                        <ImageUploader
-                            images={images}
-                            onAddImages={handleAddImages}
-                            onRemoveImage={removeImage}
-                            onReorderImages={reorderImages}
-                        />
-                        {errors.images && (
-                            <p className="text-red-500 text-sm mt-1">{errors.images}</p>
-                        )}
-                    </div>
+                        {/* 내용 */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
+                            <textarea value={content} onChange={(e) => setContent(e.target.value)}
+                                className="input-field resize-none" rows={6}
+                                placeholder="내용을 입력하세요 (선택, 최대 500자)" maxLength={500} />
+                            <p className="text-xs text-gray-400 mt-1 text-right">{content.length}/500</p>
+                        </div>
 
-                    {/* 내용 */}
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium mb-2">
-                            내용 <span className="text-gray-400">(선택)</span>
-                        </label>
-                        <textarea
-                            name="content"
-                            value={formData.content}
-                            onChange={handleChange}
-                            className="input-field"
-                            placeholder="내용을 입력하세요 (최대 500자)"
-                            rows={10}
-                            maxLength={500}
-                        />
-                        <p className="text-sm text-gray-500 mt-1">
-                            {formData.content.length}/500
-                        </p>
-                        {errors.content && (
-                            <p className="text-red-500 text-sm mt-1">{errors.content}</p>
-                        )}
-                    </div>
+                        {/* 이미지 */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                이미지 <span className="text-red-500">*</span>
+                            </label>
+                            <ImageUploader
+                                images={images}
+                                onAddImages={(files) => addImages(files).catch((e) => setToast({ message: e.message, type: 'error' }))}
+                                onRemoveImage={removeImage}
+                                onReorderImages={reorderImages}
+                            />
+                        </div>
 
-                    {/* 버튼 */}
-                    <div className="flex gap-4">
-                        <button
-                            type="submit"
-                            disabled={loading || uploading}
-                            className="flex-1 btn-primary"
-                        >
-                            {loading || uploading ? '저장 중...' : postId ? '수정 완료' : '글쓰기'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => router.back()}
-                            disabled={loading || uploading}
-                            className="flex-1 btn-secondary"
-                        >
-                            취소
-                        </button>
-                    </div>
+                        {/* 버튼 */}
+                        <div className="flex gap-3 justify-end pt-2">
+                            <button type="button" onClick={() => router.back()} className="btn-secondary">
+                                취소
+                            </button>
+                            <button type="submit" disabled={submitting || uploading} className="btn-primary min-w-[100px]">
+                                {submitting || uploading ? `업로드 중... ${uploadProgress}%` : postId ? '수정 완료' : '등록'}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-            </form>
-
-            {(loading || uploading) && (
-                <Loading
-                    progress={uploading ? uploadProgress : undefined}
-                    message={uploading ? '이미지 업로드 중...' : '게시글 저장 중...'}
-                />
-            )}
+            </div>
 
             {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+            {(submitting || uploading) && <Loading message="업로드 중..." progress={uploadProgress} />}
 
-            {/* 성공 모달 */}
-            <Modal
-                isOpen={showSuccessModal}
-                onClose={handleSuccessConfirm}
-                title={postId ? '수정 완료' : '글쓰기 완료'}
-                confirmText="확인"
-                onConfirm={handleSuccessConfirm}
-            >
+            <Modal isOpen={showSuccessModal} onClose={handleSuccessConfirm}
+                title={postId ? '수정 완료' : '등록 완료'} confirmText="확인" onConfirm={handleSuccessConfirm}>
                 <p className="text-gray-700">
-                    {postId ? '게시글이 수정되었습니다.' : '게시글 작성이 완료되었습니다.'}
+                    {postId ? '게시글이 수정되었습니다.' : '게시글이 등록되었습니다.'}
                 </p>
             </Modal>
         </>

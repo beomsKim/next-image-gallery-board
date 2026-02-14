@@ -1,74 +1,48 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // 헬퍼 함수들
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
+
     function isAdmin() {
-      return isAuthenticated() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
     }
-    
-    // Users 컬렉션
+
     match /users/{userId} {
-      // 읽기: 로그인한 사용자만
       allow read: if isAuthenticated();
-      
-      // 생성: 본인 계정만
-      allow create: if isAuthenticated() && isOwner(userId);
-      
-      // 수정: 본인 계정만
-      allow update: if isAuthenticated() && isOwner(userId);
-      
-      // 삭제: 본인 계정만
-      allow delete: if isAuthenticated() && isOwner(userId);
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
     }
-    
-    // Posts 컬렉션
+
     match /posts/{postId} {
-      // 읽기: 로그인한 사용자만
-      allow read: if isAuthenticated();
-      
-      // 생성: 로그인한 사용자만
-      allow create: if isAuthenticated() &&
-                      request.resource.data.authorId == request.auth.uid;
-      
-      // 수정: 작성자 또는 관리자
-      allow update: if isAuthenticated() && 
-                      (isOwner(resource.data.authorId) || isAdmin());
-      
-      // 삭제: 작성자 또는 관리자
-      allow delete: if isAuthenticated() && 
-                      (isOwner(resource.data.authorId) || isAdmin());
-    }
-    
-    // Categories 컬렉션
-    match /categories/{categoryId} {
-      // 읽기: 로그인한 사용자만
-      allow read: if isAuthenticated();
-      
-      // 생성: 로그인한 사용자만 (글 작성 시 자동 생성)
+      allow read: if true;
       allow create: if isAuthenticated();
-      
-      // 수정: 관리자만
-      allow update: if isAdmin();
-      
-      // 삭제: 관리자만, 기본 카테고리가 아닌 경우만
-      allow delete: if isAdmin() && 
-                      resource.data.isDefault == false;
+      allow update: if isAuthenticated() &&
+        (resource.data.authorId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() &&
+        (resource.data.authorId == request.auth.uid || isAdmin());
     }
-    
-    // 다른 컬렉션은 기본적으로 거부
-    match /{document=**} {
-      allow read, write: if false;
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /withdrawal_reasons/{docId} {
+      allow create: if isAuthenticated();
+      allow read: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

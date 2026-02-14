@@ -1,17 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Post } from '@/types/post';
 import { formatRelativeTime, formatNumber } from '@/utils/format';
 import { AiOutlineHeart, AiFillHeart, AiOutlineEye } from 'react-icons/ai';
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
-import { FiMoreVertical } from 'react-icons/fi';
 import Toast from '@/components/common/Toast';
+import Modal from '@/components/common/Modal';
 
 interface PostCardProps {
     post: Post;
@@ -23,184 +23,208 @@ interface PostCardProps {
 export default function PostCard({ post, showCheckbox, checked, onCheck }: PostCardProps) {
     const router = useRouter();
     const { user } = useAuth();
-
-    const [liked, setLiked] = useState(user?.likedPosts?.includes(post.id) || false);
-    const [bookmarked, setBookmarked] = useState(user?.bookmarkedPosts?.includes(post.id) || false);
-    const [likeCount, setLikeCount] = useState(post.likes);
+    const [liked, setLiked] = useState(false);
+    const [bookmarked, setBookmarked] = useState(false);
+    const [likeCount, setLikeCount] = useState(post.likes || 0);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+    const [showLoginModal, setShowLoginModal] = useState(false);
+
+    useEffect(() => {
+        setLiked(user?.likedPosts?.includes(post.id) || false);
+        setBookmarked(user?.bookmarkedPosts?.includes(post.id) || false);
+    }, [user, post.id]);
 
     const handleCardClick = () => {
+        if (!user) { setShowLoginModal(true); return; }
         router.push(`/posts/${post.id}`);
     };
 
     const handleLike = async (e: React.MouseEvent) => {
         e.stopPropagation();
-
-        if (!user) {
-            setToast({ message: '로그인이 필요합니다.', type: 'error' });
-            return;
-        }
-
+        if (!user) { setShowLoginModal(true); return; }
+        const newLiked = !liked;
+        setLiked(newLiked);
+        setLikeCount((p) => newLiked ? p + 1 : p - 1);
         try {
-            const userRef = doc(db, 'users', user.uid);
-            const postRef = doc(db, 'posts', post.id);
-
-            if (liked) {
-                // 좋아요 취소
-                await updateDoc(userRef, {
-                    likedPosts: arrayRemove(post.id),
-                });
-                await updateDoc(postRef, {
-                    likes: post.likes - 1,
-                });
-                setLiked(false);
-                setLikeCount(prev => prev - 1);
+            if (newLiked) {
+                await updateDoc(doc(db, 'users', user.uid), { likedPosts: arrayUnion(post.id) });
+                await updateDoc(doc(db, 'posts', post.id), { likes: increment(1) });
+                user.likedPosts = [...(user.likedPosts || []), post.id];
             } else {
-                // 좋아요
-                await updateDoc(userRef, {
-                    likedPosts: arrayUnion(post.id),
-                });
-                await updateDoc(postRef, {
-                    likes: post.likes + 1,
-                });
-                setLiked(true);
-                setLikeCount(prev => prev + 1);
+                await updateDoc(doc(db, 'users', user.uid), { likedPosts: arrayRemove(post.id) });
+                await updateDoc(doc(db, 'posts', post.id), { likes: increment(-1) });
+                user.likedPosts = (user.likedPosts || []).filter((id) => id !== post.id);
             }
-        } catch (error) {
-            console.error('좋아요 처리 실패:', error);
+        } catch {
+            setLiked(!newLiked);
+            setLikeCount((p) => newLiked ? p - 1 : p + 1);
             setToast({ message: '오류가 발생했습니다.', type: 'error' });
         }
     };
 
     const handleBookmark = async (e: React.MouseEvent) => {
         e.stopPropagation();
-
-        if (!user) {
-            setToast({ message: '로그인이 필요합니다.', type: 'error' });
-            return;
-        }
-
+        if (!user) { setShowLoginModal(true); return; }
+        const nb = !bookmarked;
+        setBookmarked(nb);
         try {
-            const userRef = doc(db, 'users', user.uid);
-
-            if (bookmarked) {
-                // 북마크 취소
-                await updateDoc(userRef, {
-                    bookmarkedPosts: arrayRemove(post.id),
-                });
-                setBookmarked(false);
-                setToast({ message: '북마크가 해제되었습니다.', type: 'success' });
+            if (nb) {
+                await updateDoc(doc(db, 'users', user.uid), { bookmarkedPosts: arrayUnion(post.id) });
+                user.bookmarkedPosts = [...(user.bookmarkedPosts || []), post.id];
+                setToast({ message: '북마크 추가!', type: 'success' });
             } else {
-                // 북마크
-                await updateDoc(userRef, {
-                    bookmarkedPosts: arrayUnion(post.id),
-                });
-                setBookmarked(true);
-                setToast({ message: "'북마크' 정렬로 확인 가능합니다.", type: 'success' });
+                await updateDoc(doc(db, 'users', user.uid), { bookmarkedPosts: arrayRemove(post.id) });
+                user.bookmarkedPosts = (user.bookmarkedPosts || []).filter((id) => id !== post.id);
             }
-        } catch (error) {
-            console.error('북마크 처리 실패:', error);
+        } catch {
+            setBookmarked(!nb);
             setToast({ message: '오류가 발생했습니다.', type: 'error' });
         }
     };
 
     return (
         <>
-            <div className="card cursor-pointer hover:shadow-xl transition-all relative group">
-                {/* 체크박스 */}
-                {showCheckbox && (
-                    <div className="absolute top-2 left-2 z-10">
-                        <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e) => {
-                                e.stopPropagation();
-                                onCheck?.(post.id, e.target.checked);
-                            }}
-                            className="w-5 h-5 cursor-pointer"
-                        />
-                    </div>
-                )}
-
-                {/* 핀 표시 */}
-                {post.isPinned && (
-                    <div className="absolute top-2 right-2 bg-primary-600 text-white text-xs px-2 py-1 rounded z-10">
-                        📌 고정
-                    </div>
-                )}
-
-                <div
-                    className="p-1"
-                    onClick={handleCardClick}
-                >
-                    {/* 썸네일 */}
-                    <div className="relative aspect-square w-full bg-gray-100 rounded-lg overflow-hidden mb-3">
+            <div
+                onClick={handleCardClick}
+                className="bg-white rounded-2xl overflow-hidden shadow-card border border-gray-100
+                   hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]
+                   transition-all duration-200 cursor-pointer group"
+            >
+                {/* 썸네일 - 세로 비율 */}
+                <div className="relative w-full overflow-hidden bg-gray-100" style={{ paddingBottom: '140%' }}>
+                    {user ? (
                         <Image
-                            src={post.thumbnailUrl}
+                            src={post.thumbnailUrl || '/images/placeholder.png'}
                             alt={post.title}
                             fill
-                            className="object-cover"
+                            className="object-cover group-hover:scale-105 transition-transform duration-500"
                             loading="lazy"
-                            placeholder="blur"
-                            blurDataURL="/images/default-thumbnail.png"
+                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                         />
+                    ) : (
+                        <>
+                            <Image
+                                src={post.thumbnailUrl || '/images/placeholder.png'}
+                                alt="" fill aria-hidden
+                                className="object-cover scale-110"
+                                style={{ filter: 'blur(22px) brightness(0.55)', transform: 'scale(1.2)' }}
+                                loading="lazy"
+                            />
+                            {/* 픽셀 오버레이 */}
+                            <div className="absolute inset-0" style={{
+                                background: `repeating-linear-gradient(0deg,rgba(0,0,0,0.1) 0,rgba(0,0,0,0.1) 2px,transparent 2px,transparent 10px),
+                             repeating-linear-gradient(90deg,rgba(0,0,0,0.1) 0,rgba(0,0,0,0.1) 2px,transparent 2px,transparent 10px)`,
+                            }} />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/15">
+                                <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-4 py-3.5
+                               text-center shadow-xl mx-4 border border-white/50">
+                                    <p className="text-xl mb-1">🔒</p>
+                                    <p className="text-gray-800 font-bold text-xs">회원 전용</p>
+                                    <p className="text-gray-500 text-[11px] mt-0.5">로그인 후 감상하세요</p>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* 고정 뱃지 */}
+                    {post.isPinned && (
+                        <div className="absolute top-2 left-2">
+                            <div className="flex items-center gap-1 bg-gradient-to-r from-amber-400 to-orange-500
+                             text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-md">
+                                <span>📌</span>
+                                <span>고정</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 체크박스 */}
+                    {showCheckbox && (
+                        <div className="absolute top-2 right-2">
+                            <div
+                                onClick={(e) => { e.stopPropagation(); onCheck?.(post.id, !checked); }}
+                                className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center
+                           transition-all cursor-pointer
+                           ${checked ? 'bg-indigo-600 border-indigo-600' : 'bg-white/80 border-gray-300'}`}
+                            >
+                                {checked && (
+                                    <svg width="12" height="10" viewBox="0 0 12 10" fill="none">
+                                        <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                    </svg>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 좋아요/북마크 오버레이 (호버 시 표시) */}
+                    <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100
+                         transition-opacity duration-200 flex justify-between items-end
+                         bg-gradient-to-t from-black/40 to-transparent">
+                        <button onClick={handleLike}
+                            className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg
+                         backdrop-blur-sm transition-all active:scale-90
+                         ${liked ? 'bg-red-500 text-white' : 'bg-white/80 text-gray-700'}`}>
+                            {liked ? <AiFillHeart size={13} /> : <AiOutlineHeart size={13} />}
+                            {formatNumber(likeCount)}
+                        </button>
+                        <button onClick={handleBookmark}
+                            className={`p-1.5 rounded-lg backdrop-blur-sm transition-all active:scale-90
+                         ${bookmarked ? 'bg-indigo-500 text-white' : 'bg-white/80 text-gray-700'}`}>
+                            {bookmarked ? <BsBookmarkFill size={13} /> : <BsBookmark size={13} />}
+                        </button>
                     </div>
+                </div>
 
-                    {/* 제목 */}
-                    <h3 className="font-semibold text-lg mb-2 line-clamp-2">
-                        {post.title}
-                    </h3>
-
-                    {/* 카테고리 */}
-                    <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                {/* 카드 정보 */}
+                <div className="p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg">
                             {post.category}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                            {formatRelativeTime(post.createdAt instanceof Date ? post.createdAt : post.createdAt.toDate())}
                         </span>
                     </div>
 
-                    {/* 작성자 및 날짜 */}
-                    <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+                    {/* 제목 1줄 말줄임 */}
+                    <h3 className="font-semibold text-gray-900 text-sm truncate leading-snug mb-2">
+                        {post.title}
+                    </h3>
+
+                    <div className="flex items-center justify-between">
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
+                                if (!user) { setShowLoginModal(true); return; }
                                 router.push(`/?author=${post.authorNickname}`);
                             }}
-                            className="hover:underline"
-                        >
+                            className="text-[11px] text-gray-400 hover:text-indigo-600 truncate max-w-[60%] transition-colors">
                             {post.authorNickname}
                         </button>
-                        <span>{formatRelativeTime(post.createdAt instanceof Date ? post.createdAt : post.createdAt.toDate())}</span>
-                    </div>
-
-                    {/* 통계 */}
-                    <div className="flex items-center justify-between border-t pt-3">
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                                <AiOutlineEye size={18} />
-                                {formatNumber(post.views)}
-                            </div>
-                            <button
-                                onClick={handleLike}
-                                className={`flex items-center gap-1 transition-colors ${liked ? 'text-red-500' : 'hover:text-red-500'
-                                    }`}
-                            >
-                                {liked ? <AiFillHeart size={18} /> : <AiOutlineHeart size={18} />}
+                        <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                            <span className="flex items-center gap-0.5">
+                                <AiOutlineEye size={12} />
+                                {formatNumber(post.views || 0)}
+                            </span>
+                            <span className={`flex items-center gap-0.5 ${liked ? 'text-red-500' : ''}`}>
+                                <AiOutlineHeart size={12} />
                                 {formatNumber(likeCount)}
-                            </button>
+                            </span>
                         </div>
-
-                        <button
-                            onClick={handleBookmark}
-                            className={`transition-colors ${bookmarked ? 'text-primary-600' : 'text-gray-400 hover:text-primary-600'
-                                }`}
-                        >
-                            {bookmarked ? <BsBookmarkFill size={18} /> : <BsBookmark size={18} />}
-                        </button>
                     </div>
                 </div>
             </div>
 
             {toast && <Toast {...toast} onClose={() => setToast(null)} />}
+
+            <Modal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)}
+                title="로그인이 필요해요" confirmText="로그인하기" cancelText="취소"
+                onConfirm={() => { setShowLoginModal(false); router.push('/login'); }}>
+                <div className="text-center py-2">
+                    <p className="text-5xl mb-4">🔒</p>
+                    <p className="text-gray-700 font-semibold mb-1">회원만 볼 수 있어요</p>
+                    <p className="text-gray-400 text-sm">가입하면 모든 이미지를 자유롭게 즐길 수 있어요!</p>
+                </div>
+            </Modal>
         </>
     );
 }

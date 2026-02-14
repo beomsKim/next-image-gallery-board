@@ -1,4 +1,5 @@
 import { Timestamp } from 'firebase/firestore';
+
 export interface Post {
     id: string;
     title: string;
@@ -13,6 +14,7 @@ export interface Post {
     isPinned: boolean;
     createdAt: Timestamp | Date;
     updatedAt: Timestamp | Date;
+    editHistory?: { editedAt: Timestamp | Date }[];
 }
 
 export interface PostFormData {

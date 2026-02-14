@@ -11,6 +11,7 @@ export interface User {
     bookmarkedPosts: string[];
 }
 
-export interface UserProfile extends User {
-    photoURL?: string;
+export interface UserProfile {
+    nickname?: string;
+    email?: string;
 }

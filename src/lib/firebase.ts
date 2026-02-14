@@ -13,7 +13,6 @@ const firebaseConfig = {
     measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// Firebase 앱 초기화
 let app: FirebaseApp;
 if (!getApps().length) {
     app = initializeApp(firebaseConfig);
@@ -21,9 +20,7 @@ if (!getApps().length) {
     app = getApps()[0];
 }
 
-// Firebase 서비스 초기화
 export const auth: Auth = getAuth(app);
 export const db: Firestore = getFirestore(app);
 export const storage: FirebaseStorage = getStorage(app);
-
 export default app;

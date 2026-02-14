@@ -10,46 +10,30 @@ import Loading from '@/components/common/Loading';
 
 export default function EditPostPage({ params }: { params: Promise<{ id: string }> }) {
     const { id: postId } = use(params);
-
     const router = useRouter();
     const { user } = useAuth();
-
     const [initialData, setInitialData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (postId) {
-            loadPost();
-        }
+        if (postId) loadPost();
     }, [postId]);
 
     const loadPost = async () => {
         try {
             const postDoc = await getDoc(doc(db, 'posts', postId));
-
-            if (!postDoc.exists()) {
-                alert('게시글을 찾을 수 없습니다.');
-                router.push('/');
-                return;
-            }
-
-            const postData = postDoc.data();
-
-            // 권한 확인
-            if (postData.authorId !== user?.uid && !user?.isAdmin) {
+            if (!postDoc.exists()) { router.push('/'); return; }
+            const data = postDoc.data();
+            if (data.authorId !== user?.uid && !user?.isAdmin) {
                 alert('수정 권한이 없습니다.');
                 router.push('/');
                 return;
             }
-
             setInitialData({
-                title: postData.title,
-                content: postData.content,
-                category: postData.category,
-                images: postData.images || [],
+                title: data.title, content: data.content,
+                category: data.category, images: data.images || [],
             });
-        } catch (error) {
-            console.error('게시글 로드 실패:', error);
+        } catch {
             alert('게시글을 불러오는데 실패했습니다.');
             router.push('/');
         } finally {
@@ -57,13 +41,8 @@ export default function EditPostPage({ params }: { params: Promise<{ id: string 
         }
     };
 
-    if (loading) {
-        return <Loading message="게시글을 불러오는 중..." />;
-    }
-
-    if (!initialData) {
-        return null;
-    }
+    if (loading) return <Loading message="게시글을 불러오는 중..." />;
+    if (!initialData) return null;
 
     return (
         <main className="min-h-screen bg-gray-50 py-8">
