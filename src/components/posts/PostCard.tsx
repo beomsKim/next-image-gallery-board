@@ -28,6 +28,7 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
     const [likeCount, setLikeCount] = useState(post.likes || 0);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [showLoginModal, setShowLoginModal] = useState(false);
+    const [imgLoaded, setImgLoaded] = useState(false);
 
     useEffect(() => {
         setLiked(user?.likedPosts?.includes(post.id) || false);
@@ -86,21 +87,29 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
         <>
             <div
                 onClick={handleCardClick}
-                className="bg-white rounded-2xl overflow-hidden shadow-card border border-gray-100
-                   hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]
-                   transition-all duration-200 cursor-pointer group"
+                className="bg-white rounded-2xl overflow-hidden shadow-card border border-gray-100 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 cursor-pointer group"
             >
                 {/* 썸네일 - 세로 비율 */}
                 <div className="relative w-full overflow-hidden bg-gray-100" style={{ paddingBottom: '140%' }}>
                     {user ? (
-                        <Image
-                            src={post.thumbnailUrl || '/images/placeholder.png'}
-                            alt={post.title}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-500"
-                            loading="lazy"
-                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                        />
+                        <>
+                            {/* 스켈레톤 */}
+                            {!imgLoaded && (
+                                <div className="absolute inset-0 skeleton" />
+                            )}
+                            <Image
+                                src={post.thumbnailUrl || '/images/placeholder.png'}
+                                alt={post.title}
+                                fill
+                                className={`
+                                    object-cover group-hover:scale-105 transition-all duration-500
+                                    ${imgLoaded ? 'opacity-100' : 'opacity-0'}
+                                `}
+                                loading="lazy"
+                                onLoad={() => setImgLoaded(true)}
+                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                            />
+                        </>
                     ) : (
                         <>
                             <Image
@@ -112,12 +121,10 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
                             />
                             {/* 픽셀 오버레이 */}
                             <div className="absolute inset-0" style={{
-                                background: `repeating-linear-gradient(0deg,rgba(0,0,0,0.1) 0,rgba(0,0,0,0.1) 2px,transparent 2px,transparent 10px),
-                             repeating-linear-gradient(90deg,rgba(0,0,0,0.1) 0,rgba(0,0,0,0.1) 2px,transparent 2px,transparent 10px)`,
+                                background: `repeating-linear-gradient(0deg,rgba(0,0,0,0.1) 0,rgba(0,0,0,0.1) 2px,transparent 2px,transparent 10px), repeating-linear-gradient(90deg,rgba(0,0,0,0.1) 0,rgba(0,0,0,0.1) 2px,transparent 2px,transparent 10px)`,
                             }} />
                             <div className="absolute inset-0 flex items-center justify-center bg-black/15">
-                                <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-4 py-3.5
-                               text-center shadow-xl mx-4 border border-white/50">
+                                <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-4 py-3.5 text-center shadow-xl mx-4 border border-white/50">
                                     <p className="text-xl mb-1">🔒</p>
                                     <p className="text-gray-800 font-bold text-xs">회원 전용</p>
                                     <p className="text-gray-500 text-[11px] mt-0.5">로그인 후 감상하세요</p>
@@ -129,8 +136,7 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
                     {/* 고정 뱃지 */}
                     {post.isPinned && (
                         <div className="absolute top-2 left-2">
-                            <div className="flex items-center gap-1 bg-gradient-to-r from-amber-400 to-orange-500
-                             text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-md">
+                            <div className="flex items-center gap-1 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-lg shadow-md">
                                 <span>📌</span>
                                 <span>고정</span>
                             </div>
@@ -142,9 +148,10 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
                         <div className="absolute top-2 right-2">
                             <div
                                 onClick={(e) => { e.stopPropagation(); onCheck?.(post.id, !checked); }}
-                                className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center
-                           transition-all cursor-pointer
-                           ${checked ? 'bg-indigo-600 border-indigo-600' : 'bg-white/80 border-gray-300'}`}
+                                className={`
+                                    w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all cursor-pointer
+                                    ${checked ? 'bg-indigo-600 border-indigo-600' : 'bg-white/80 border-gray-300'}
+                                `}
                             >
                                 {checked && (
                                     <svg width="12" height="10" viewBox="0 0 12 10" fill="none">

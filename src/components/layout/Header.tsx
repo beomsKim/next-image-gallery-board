@@ -41,8 +41,10 @@ export default function Header() {
     return (
         <>
             {/* 데스크톱 헤더 */}
-            <header className={`hidden md:block sticky top-0 z-40 transition-all duration-200
-        ${scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100' : 'bg-white border-b border-gray-100'}`}>
+            <header className={`
+                hidden md:block sticky top-0 z-40 transition-all duration-200
+                ${scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100' : 'bg-white border-b border-gray-100'}
+            `}>
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     {/* 로고 */}
                     <Link href="/" className="flex items-center gap-2.5 group">
@@ -57,10 +59,10 @@ export default function Header() {
                     <nav className="flex items-center gap-2">
                         {user ? (
                             <>
-                                <Link href="/posts/new"
-                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white
-                             rounded-xl text-sm font-semibold hover:bg-indigo-700
-                             active:scale-95 transition-all">
+                                <Link
+                                    href="/posts/new"
+                                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 active:scale-95 transition-all"
+                                >
                                     <FiPlusSquare size={16} />
                                     글쓰기
                                 </Link>
@@ -80,6 +82,7 @@ export default function Header() {
                                                 : 'text-gray-500 hover:bg-gray-100'}`}>
                                         <FiSettings size={16} />
                                         관리자
+                                        {user.isAdmin}
                                     </Link>
                                 )}
                                 <button onClick={() => setShowLogoutModal(true)}
@@ -99,8 +102,10 @@ export default function Header() {
             </header>
 
             {/* 모바일 헤더 (상단) */}
-            <header className={`md:hidden sticky top-0 z-40 transition-all duration-200
-        ${scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-white'}`}>
+            <header className={`
+                md:hidden sticky top-0 z-40 transition-all duration-200
+                ${scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-white'}
+            `}>
                 <div className="flex items-center justify-between px-4 h-14">
                     <Link href="/" className="flex items-center gap-2">
                         <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
@@ -112,8 +117,7 @@ export default function Header() {
                     <div className="flex items-center gap-1">
                         {user && (
                             <Link href="/posts/new"
-                                className="w-9 h-9 flex items-center justify-center bg-indigo-600
-                           rounded-xl text-white active:scale-95 transition-all">
+                                className="w-9 h-9 flex items-center justify-center bg-indigo-600 rounded-xl text-white active:scale-95 transition-all">
                                 <FiPlusSquare size={18} />
                             </Link>
                         )}
@@ -128,9 +132,7 @@ export default function Header() {
 
             {/* 모바일 하단 네비게이션 */}
             {user && (
-                <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40
-                       bg-white/95 backdrop-blur-md border-t border-gray-100
-                       pb-safe-area-inset-bottom">
+                <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-gray-100 pb-safe-area-inset-bottom">
                     <div className="flex items-center h-16 px-2">
                         {[
                             { href: '/', icon: FiHome, label: '홈' },
@@ -160,8 +162,7 @@ export default function Header() {
                 <>
                     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm animate-fadeIn md:hidden"
                         onClick={() => setShowMenu(false)} />
-                    <div className="fixed top-0 right-0 bottom-0 z-50 w-[280px] bg-white
-                         shadow-2xl animate-slideIn md:hidden flex flex-col">
+                    <div className="fixed top-0 right-0 bottom-0 z-50 w-[280px] bg-white shadow-2xl animate-slideIn md:hidden flex flex-col">
                         {/* 메뉴 헤더 */}
                         <div className="flex items-center justify-between px-5 h-14 border-b border-gray-100">
                             <span className="font-bold text-gray-900">메뉴</span>

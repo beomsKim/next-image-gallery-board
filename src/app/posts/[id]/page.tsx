@@ -217,13 +217,20 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                         </div>
 
                         {/* 이미지 */}
-                        {post.images?.length > 0 && (
+                        {post.images && post.images.length > 0 && (
                             <div className="border-t border-gray-50">
                                 {post.images.map((url, i) => (
-                                    <div key={i} className="border-b border-gray-50 last:border-b-0">
-                                        <Image src={url} alt={`${post.title} - ${i + 1}`}
-                                            width={800} height={600}
-                                            className="w-full h-auto" />
+                                    <div key={i} className="border-b border-gray-50 last:border-b-0 bg-black">
+                                        <div className="relative w-full" style={{ maxHeight: '600px' }}>
+                                            <Image
+                                                src={url}
+                                                alt={`${post.title} - ${i + 1}`}
+                                                width={800}
+                                                height={600}
+                                                className="w-full h-auto object-contain"
+                                                style={{ maxHeight: '600px' }}
+                                            />
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -259,7 +266,7 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                         </div>
                     </div>
 
-                    <button onClick={() => router.back()}
+                    <button onClick={() => router.push('/')}
                         className="w-full btn-secondary py-3.5">
                         ← 목록으로
                     </button>

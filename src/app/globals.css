@@ -20,6 +20,7 @@
     @apply bg-slate-50 text-gray-900;
     /* 모바일 하단 네비게이션 여백 */
     padding-bottom: env(safe-area-inset-bottom);
+    word-break: keep-all;
   }
 
   /* 모바일 safe area */

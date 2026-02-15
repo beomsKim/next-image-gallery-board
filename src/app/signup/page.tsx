@@ -21,18 +21,12 @@ export default function SignupPage() {
             setToast({ message: '비밀번호가 일치하지 않습니다.', type: 'error' });
             return;
         }
-        if (password.length < 6) {
-            setToast({ message: '비밀번호는 6자 이상이어야 합니다.', type: 'error' });
-            return;
-        }
         setLoading(true);
         try {
             await signUp(email, password);
-            setToast({ message: '회원가입 완료! 이메일 인증 후 로그인해주세요.', type: 'success' });
-            setTimeout(() => router.push('/login'), 2000);
+            router.push('/');
         } catch (error: any) {
             setToast({ message: error.message, type: 'error' });
-        } finally {
             setLoading(false);
         }
     };

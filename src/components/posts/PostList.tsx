@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
     collection, query, where, orderBy, getDocs,
-    deleteDoc, doc, getDoc, updateDoc
+    limit, startAfter, QueryDocumentSnapshot, DocumentData,
+    deleteDoc, doc, updateDoc
 } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
@@ -31,41 +32,76 @@ export default function PostList() {
     const [sortBy, setSortBy] = useState('latest');
     const [searchQuery, setSearchQuery] = useState('');
 
-    useEffect(() => { loadPosts(); }, [category, sortBy, searchQuery, user]);
+    const [lastDoc, setLastDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
 
-    const loadPosts = async () => {
-        setLoading(true);
+    const PAGE_SIZE = 20;
+
+    useEffect(() => { loadPosts(true); }, [category, sortBy, searchQuery, user]);
+
+    const loadPosts = async (reset = true) => {
+        if (reset) {
+            setLoading(true);
+            setLastDoc(null);
+            setHasMore(true);
+        } else {
+            setLoadingMore(true);
+        }
+
         try {
             const authorParam = searchParams.get('author');
-            let q = query(collection(db, 'posts'));
+            let baseQuery;
 
             if (sortBy === 'my' && user) {
-                q = query(q, where('authorId', '==', user.uid), orderBy('createdAt', 'desc'));
-            } else if (sortBy === 'liked' && user) {
-                q = query(q, orderBy('createdAt', 'desc'));
-            } else if (sortBy === 'bookmarked' && user) {
-                q = query(q, orderBy('createdAt', 'desc'));
+                baseQuery = query(
+                    collection(db, 'posts'),
+                    where('authorId', '==', user.uid),
+                    orderBy('createdAt', 'desc'),
+                    limit(PAGE_SIZE)
+                );
             } else if (authorParam) {
-                q = query(q, where('authorNickname', '==', authorParam), orderBy('createdAt', 'desc'));
+                baseQuery = query(
+                    collection(db, 'posts'),
+                    where('authorNickname', '==', authorParam),
+                    orderBy('createdAt', 'desc'),
+                    limit(PAGE_SIZE)
+                );
             } else if (category && category !== '전체') {
-                if (sortBy === 'oldest') q = query(q, where('category', '==', category), orderBy('createdAt', 'asc'));
-                else if (sortBy === 'views') q = query(q, where('category', '==', category), orderBy('views', 'desc'));
-                else q = query(q, where('category', '==', category), orderBy('createdAt', 'desc'));
+                const sortField = sortBy === 'views' ? 'views' : 'createdAt';
+                const sortDir = sortBy === 'oldest' ? 'asc' : 'desc';
+                baseQuery = query(
+                    collection(db, 'posts'),
+                    where('category', '==', category),
+                    orderBy(sortField, sortDir),
+                    limit(PAGE_SIZE)
+                );
             } else {
-                if (sortBy === 'oldest') q = query(q, orderBy('createdAt', 'asc'));
-                else if (sortBy === 'views') q = query(q, orderBy('views', 'desc'));
-                else q = query(q, orderBy('createdAt', 'desc'));
+                const sortField = sortBy === 'views' ? 'views' : 'createdAt';
+                const sortDir = sortBy === 'oldest' ? 'asc' : 'desc';
+                baseQuery = query(
+                    collection(db, 'posts'),
+                    orderBy(sortField, sortDir),
+                    limit(PAGE_SIZE)
+                );
             }
 
-            const snap = await getDocs(q);
+            // 페이지네이션 - 다음 페이지
+            if (!reset && lastDoc) {
+                baseQuery = query(baseQuery, startAfter(lastDoc));
+            }
+
+            const snap = await getDocs(baseQuery);
             let data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Post[];
 
+            // liked/bookmarked 클라이언트 필터
             if (sortBy === 'liked' && user) {
                 data = data.filter((p) => user.likedPosts?.includes(p.id));
             } else if (sortBy === 'bookmarked' && user) {
                 data = data.filter((p) => user.bookmarkedPosts?.includes(p.id));
             }
 
+            // 검색 필터
             if (searchQuery) {
                 data = data.filter((p) =>
                     p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -73,18 +109,27 @@ export default function PostList() {
                 );
             }
 
+            // 고정 글 상단 정렬
             data.sort((a, b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
                 return 0;
             });
 
-            setPosts(data);
+            if (reset) {
+                setPosts(data);
+            } else {
+                setPosts((prev) => [...prev, ...data]);
+            }
+
+            setLastDoc(snap.docs[snap.docs.length - 1] || null);
+            setHasMore(snap.docs.length === PAGE_SIZE);
         } catch (e) {
             console.error('게시글 로드 실패:', e);
             setToast({ message: '게시글을 불러오는데 실패했습니다.', type: 'error' });
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
     };
 
@@ -204,6 +249,23 @@ export default function PostList() {
                     </div>
                 )}
             </div>
+
+            {hasMore && !loading && posts.length > 0 && (
+                <div className="flex justify-center mt-8 mb-4">
+                    <button
+                        onClick={() => loadPosts(false)}
+                        disabled={loadingMore}
+                        className="btn-secondary px-10 py-3 text-sm font-semibold"
+                    >
+                        {loadingMore ? (
+                            <span className="flex items-center gap-2">
+                                <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                                로딩 중...
+                            </span>
+                        ) : '더 보기'}
+                    </button>
+                </div>
+            )}
 
             {toast && <Toast {...toast} onClose={() => setToast(null)} />}
 

@@ -22,6 +22,7 @@ import {
     collection, query, where, getDocs,
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { deleteOwnAccountFn } from '@/lib/functions';
 import { User, UserProfile } from '@/types/user';
 
 interface AuthContextType {
@@ -74,7 +75,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // redirect 결과 처리
         getRedirectResult(auth).then(async (result) => {
             if (!result) return;
             const firebaseUser = result.user;
@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
                 if (userDoc.exists()) {
                     const d = userDoc.data();
-                    setUser({
+                    const userData: User = {
                         uid: firebaseUser.uid,
                         email: firebaseUser.email!,
                         nickname: d.nickname,
@@ -109,16 +109,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         updatedAt: d.updatedAt,
                         likedPosts: d.likedPosts || [],
                         bookmarkedPosts: d.bookmarkedPosts || [],
-                    });
+                    };
+                    setUser(userData);
+                    // ✅ 캐시는 저장만 (초기값으로 쓰지 않음)
+                    try {
+                        localStorage.setItem('user_cache', JSON.stringify({
+                            ...userData,
+                            createdAt: userData.createdAt instanceof Date
+                                ? userData.createdAt.toISOString()
+                                : userData.createdAt,
+                            updatedAt: userData.updatedAt instanceof Date
+                                ? userData.updatedAt.toISOString()
+                                : userData.updatedAt,
+                        }));
+                    } catch { }
                 }
             } else {
                 setUser(null);
+                try { localStorage.removeItem('user_cache'); } catch { }
             }
             setLoading(false);
         });
 
         return () => unsubscribe();
     }, []);
+
 
     const signUp = async (email: string, password: string) => {
         try {
@@ -177,7 +192,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const signOut = async () => {
         await firebaseSignOut(auth);
-        setUser(null);
+        updateUser(null);
     };
 
     const sendVerificationEmail = async () => {
@@ -224,36 +239,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const deleteAccount = async (reasons?: string[]) => {
         if (!auth.currentUser || !user) throw new Error('로그인이 필요합니다.');
         try {
-            const userId = user.uid;
-
-            // 탈퇴 사유 저장
-            if (reasons && reasons.length > 0) {
-                await setDoc(doc(db, 'withdrawal_reasons', userId), {
-                    userId,
-                    email: user.email,
-                    nickname: user.nickname,
-                    reasons,
-                    deletedAt: new Date(),
-                });
-            }
-
-            // 게시글 작성자명 변경
-            const postsQuery = query(collection(db, 'posts'), where('authorId', '==', userId));
-            const postsSnap = await getDocs(postsQuery);
-            if (!postsSnap.empty) {
-                await Promise.all(
-                    postsSnap.docs.map((postDoc) =>
-                        updateDoc(postDoc.ref, { authorNickname: '탈퇴한 사용자' })
-                    )
-                );
-            }
-
-            await deleteDoc(doc(db, 'users', userId));
-            await deleteUser(auth.currentUser);
+            // Cloud Function이 Auth + Firestore 모두 삭제
+            await deleteOwnAccountFn({ reasons: reasons || [] });
+            // 로컬 상태 초기화
+            localStorage.removeItem('user_cache');
             setUser(null);
+            await firebaseSignOut(auth);
         } catch (error: any) {
-            throw new Error(getErrorMessage(error.code));
+            // requires-recent-login 오류 처리
+            if (error.code === 'auth/requires-recent-login') {
+                throw new Error('보안을 위해 다시 로그인 후 탈퇴해주세요.');
+            }
+            throw new Error(error.message || '탈퇴 처리에 실패했습니다.');
         }
+    };
+
+    // user 업데이트 헬퍼 함수
+    const updateUser = (userData: User | null) => {
+        setUser(userData);
+        try {
+            if (userData) {
+                // Timestamp 직렬화 문제 방지 - 날짜는 ISO string으로 저장
+                const cacheData = {
+                    ...userData,
+                    createdAt: userData.createdAt instanceof Date
+                        ? userData.createdAt.toISOString()
+                        : userData.createdAt,
+                    updatedAt: userData.updatedAt instanceof Date
+                        ? userData.updatedAt.toISOString()
+                        : userData.updatedAt,
+                };
+                localStorage.setItem('user_cache', JSON.stringify(cacheData));
+            } else {
+                localStorage.removeItem('user_cache');
+            }
+        } catch { }
     };
 
     return (
