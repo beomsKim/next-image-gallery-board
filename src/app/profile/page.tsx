@@ -1,6 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import {
+    EmailAuthProvider,
+    reauthenticateWithCredential,
+    updatePassword,
+} from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useNicknameCheck } from '@/hooks/useNicknameCheck';
@@ -29,6 +35,11 @@ export default function ProfilePage() {
     const [withdrawalReasons, setWithdrawalReasons] = useState<string[]>([]);
 
     const { isChecking, isAvailable, message: nicknameMessage } = useNicknameCheck(nickname, user?.nickname);
+
+    const [currentPw, setCurrentPw] = useState('');
+    const [newPw, setNewPw] = useState('');
+    const [newPwConfirm, setNewPwConfirm] = useState('');
+    const [pwLoading, setPwLoading] = useState(false);
 
     useEffect(() => {
         if (!authLoading && !user) router.push('/login');
@@ -79,6 +90,52 @@ export default function ProfilePage() {
         }
     };
 
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!auth.currentUser) return;
+
+        // Google 로그인 사용자는 비밀번호 변경 불가
+        const isGoogleUser = auth.currentUser.providerData
+            .some((p) => p.providerId === 'google.com');
+        if (isGoogleUser) {
+            setToast({ message: 'Google 로그인 계정은 비밀번호를 변경할 수 없습니다.', type: 'error' });
+            return;
+        }
+
+        if (newPw !== newPwConfirm) {
+            setToast({ message: '새 비밀번호가 일치하지 않습니다.', type: 'error' });
+            return;
+        }
+        if (newPw.length < 6) {
+            setToast({ message: '비밀번호는 6자 이상이어야 합니다.', type: 'error' });
+            return;
+        }
+
+        setPwLoading(true);
+        try {
+            // 현재 비밀번호로 재인증
+            const credential = EmailAuthProvider.credential(auth.currentUser.email!, currentPw);
+            await reauthenticateWithCredential(auth.currentUser, credential);
+
+            // 비밀번호 변경
+            await updatePassword(auth.currentUser, newPw);
+
+            setToast({ message: '비밀번호가 변경되었습니다.', type: 'success' });
+            setCurrentPw('');
+            setNewPw('');
+            setNewPwConfirm('');
+        } catch (error: any) {
+            const msg: Record<string, string> = {
+                'auth/wrong-password': '현재 비밀번호가 올바르지 않습니다.',
+                'auth/weak-password': '비밀번호는 6자 이상이어야 합니다.',
+                'auth/too-many-requests': '너무 많은 시도입니다. 잠시 후 다시 시도해주세요.',
+            };
+            setToast({ message: msg[error.code] || '비밀번호 변경에 실패했습니다.', type: 'error' });
+        } finally {
+            setPwLoading(false);
+        }
+    };
+
     const toggleReason = (reason: string) => {
         setWithdrawalReasons((prev) =>
             prev.includes(reason) ? prev.filter((r) => r !== reason) : [...prev, reason]
@@ -118,6 +175,53 @@ export default function ProfilePage() {
                                 {loading ? '저장 중...' : '저장'}
                             </button>
                         </form>
+
+                        {auth.currentUser && !auth.currentUser.providerData.some((p) => p.providerId === 'google.com') && (
+                            <>
+                                <hr className="my-6" />
+                                <div>
+                                    <h2 className="text-lg font-bold mb-4">🔑 비밀번호 변경</h2>
+                                    <form onSubmit={handleChangePassword} className="space-y-3">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1.5">현재 비밀번호</label>
+                                            <input
+                                                type="password"
+                                                value={currentPw}
+                                                onChange={(e) => setCurrentPw(e.target.value)}
+                                                className="input-field"
+                                                placeholder="현재 비밀번호 입력"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1.5">새 비밀번호</label>
+                                            <input
+                                                type="password"
+                                                value={newPw}
+                                                onChange={(e) => setNewPw(e.target.value)}
+                                                className="input-field"
+                                                placeholder="6자 이상"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1.5">새 비밀번호 확인</label>
+                                            <input
+                                                type="password"
+                                                value={newPwConfirm}
+                                                onChange={(e) => setNewPwConfirm(e.target.value)}
+                                                className="input-field"
+                                                placeholder="새 비밀번호 재입력"
+                                                required
+                                            />
+                                        </div>
+                                        <button type="submit" disabled={pwLoading} className="w-full btn-primary py-3">
+                                            {pwLoading ? '변경 중...' : '비밀번호 변경'}
+                                        </button>
+                                    </form>
+                                </div>
+                            </>
+                        )}
 
                         <hr className="my-8" />
 

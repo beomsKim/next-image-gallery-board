@@ -18,7 +18,7 @@ import Loading from '@/components/common/Loading';
 import Toast from '@/components/common/Toast';
 import Modal from '@/components/common/Modal';
 
-type AdminTab = 'users' | 'categories' | 'posts' | 'filters' | 'withdrawal';
+type AdminTab = 'users' | 'categories' | 'posts' | 'filters' | 'withdrawal' | 'reports';
 
 const getTime = (date: Date | Timestamp): number =>
     date instanceof Date ? date.getTime() : date.toDate().getTime();
@@ -65,6 +65,9 @@ export default function AdminPage() {
     // 게시글 검색
     const [postSearch, setPostSearch] = useState('');
 
+    // 게시글 신고
+    const [reports, setReports] = useState<any[]>([]);
+
     useEffect(() => {
         if (!authLoading && user?.isAdmin) loadData();
     }, [user, authLoading, activeTab]);
@@ -77,6 +80,7 @@ export default function AdminPage() {
             else if (activeTab === 'posts') await loadPosts();
             else if (activeTab === 'filters') await loadFilters();
             else if (activeTab === 'withdrawal') await loadWithdrawalReasons();
+            else if (activeTab === 'reports') await loadReports();
         } finally {
             setLoading(false);
         }
@@ -87,6 +91,19 @@ export default function AdminPage() {
         const data = snap.docs.map((d) => ({ ...d.data() } as User));
         data.sort((a, b) => getTime(b.createdAt) - getTime(a.createdAt));
         setUsers(data);
+    };
+
+    const loadReports = async () => {
+        const snap = await getDocs(
+            query(collection(db, 'reports'), orderBy('createdAt', 'desc'))
+        );
+        setReports(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    };
+    // 신고 처리 함수
+    const handleReportAction = async (reportId: string, status: 'resolved' | 'dismissed') => {
+        await updateDoc(doc(db, 'reports', reportId), { status });
+        setToast({ message: status === 'resolved' ? '처리 완료' : '기각 처리됨', type: 'success' });
+        loadReports();
     };
 
     const loadCategories = async () => {
@@ -323,6 +340,7 @@ export default function AdminPage() {
         { id: 'posts', label: '📝 게시글' },
         { id: 'filters', label: '🚫 필터' },
         { id: 'withdrawal', label: '📋 탈퇴사유' },
+        { id: 'reports', label: '🚨 신고' },
     ];
 
     // 검색 필터
@@ -719,6 +737,109 @@ export default function AdminPage() {
                                             </table>
                                         </div>
                                     </>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'reports' && (
+                            <div>
+                                <h2 className="text-lg font-bold mb-4">
+                                    🚨 신고 목록
+                                    <span className="ml-2 text-sm font-normal text-red-500">
+                                        미처리 {reports.filter((r) => r.status === 'pending').length}건
+                                    </span>
+                                </h2>
+
+                                {/* 모바일 카드형 */}
+                                <div className="block sm:hidden space-y-3">
+                                    {reports.map((report) => (
+                                        <div key={report.id} className={`border rounded-2xl p-4
+                                            ${report.status === 'pending' ? 'border-red-200 bg-red-50' : 'border-gray-100'}`}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <p className="font-semibold text-sm truncate max-w-[200px]">{report.postTitle}</p>
+                                                    <p className="text-xs text-gray-400">{report.reporterNickname} · {formatDate(report.createdAt?.toDate?.() || report.createdAt)}</p>
+                                                </div>
+                                                <span className={`text-[10px] px-2 py-1 rounded-full font-bold shrink-0
+                                                        ${report.status === 'pending' ? 'bg-red-100 text-red-600' :
+                                                        report.status === 'resolved' ? 'bg-green-100 text-green-600' :
+                                                            'bg-gray-100 text-gray-500'}`}>
+                                                    {report.status === 'pending' ? '미처리' : report.status === 'resolved' ? '처리완료' : '기각'}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-gray-600 mb-3 bg-white px-3 py-2 rounded-xl">{report.reason}</p>
+                                            {report.status === 'pending' && (
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => router.push(`/posts/${report.postId}`)}
+                                                        className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg flex-1 text-center">
+                                                        게시글 보기
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleReportAction(report.id, 'resolved')}
+                                                        className="text-xs bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg font-medium">
+                                                        처리완료
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleReportAction(report.id, 'dismissed')}
+                                                        className="text-xs bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg font-medium">
+                                                        기각
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* 데스크톱 테이블 */}
+                                <div className="hidden sm:block overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gray-50 text-gray-500 text-xs">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left rounded-l-xl">게시글</th>
+                                                <th className="px-4 py-3 text-left">신고자</th>
+                                                <th className="px-4 py-3 text-left">사유</th>
+                                                <th className="px-4 py-3 text-center">상태</th>
+                                                <th className="px-4 py-3 text-center rounded-r-xl">작업</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {reports.map((report) => (
+                                                <tr key={report.id} className={report.status === 'pending' ? 'bg-red-50' : 'hover:bg-gray-50'}>
+                                                    <td className="px-4 py-3 max-w-[180px] truncate text-xs font-medium">{report.postTitle}</td>
+                                                    <td className="px-4 py-3 text-xs text-gray-500">{report.reporterNickname}</td>
+                                                    <td className="px-4 py-3 text-xs">{report.reason}</td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <span className={`text-[10px] px-2 py-1 rounded-full font-bold
+                                                                ${report.status === 'pending' ? 'bg-red-100 text-red-600' :
+                                                                report.status === 'resolved' ? 'bg-green-100 text-green-600' :
+                                                                    'bg-gray-100 text-gray-500'}`}>
+                                                            {report.status === 'pending' ? '미처리' : report.status === 'resolved' ? '처리완료' : '기각'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {report.status === 'pending' && (
+                                                            <div className="flex justify-center gap-2">
+                                                                <button onClick={() => router.push(`/posts/${report.postId}`)}
+                                                                    className="text-xs text-indigo-500 hover:underline">보기</button>
+                                                                <button onClick={() => handleReportAction(report.id, 'resolved')}
+                                                                    className="text-xs text-green-600 hover:underline">처리완료</button>
+                                                                <button onClick={() => handleReportAction(report.id, 'dismissed')}
+                                                                    className="text-xs text-gray-400 hover:underline">기각</button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {reports.length === 0 && (
+                                    <div className="text-center py-12">
+                                        <p className="text-4xl mb-3">✅</p>
+                                        <p className="text-gray-400 text-sm">신고가 없습니다.</p>
+                                    </div>
                                 )}
                             </div>
                         )}

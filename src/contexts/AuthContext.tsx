@@ -111,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                         bookmarkedPosts: d.bookmarkedPosts || [],
                     };
                     setUser(userData);
-                    // ✅ 캐시는 저장만 (초기값으로 쓰지 않음)
+                    // 캐시는 저장만 (초기값으로 쓰지 않음)
                     try {
                         localStorage.setItem('user_cache', JSON.stringify({
                             ...userData,

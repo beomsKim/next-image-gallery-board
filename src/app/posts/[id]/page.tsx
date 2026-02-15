@@ -16,6 +16,8 @@ import { hasViewedPost, markPostAsViewed } from '@/utils/storage';
 import { AiOutlineHeart, AiFillHeart, AiOutlineEye } from 'react-icons/ai';
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
 import { FiEdit, FiTrash2 } from 'react-icons/fi';
+import ImageViewer from '@/components/common/ImageViewer';
+import ReportButton from '@/components/posts/ReportButton';
 import Loading from '@/components/common/Loading';
 import Toast from '@/components/common/Toast';
 import Modal from '@/components/common/Modal';
@@ -32,6 +34,8 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
     const [likeCount, setLikeCount] = useState(0);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+    const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
     useEffect(() => { loadPost(); }, [postId]);
 
@@ -163,6 +167,10 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                                 </button>
                             </div>
                         )}
+
+                        {user && user.uid !== post.authorId && (
+                            <ReportButton postId={postId} postTitle={post.title} />
+                        )}
                     </div>
                 </div>
 
@@ -220,20 +228,31 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                         {post.images && post.images.length > 0 && (
                             <div className="border-t border-gray-50">
                                 {post.images.map((url, i) => (
-                                    <div key={i} className="border-b border-gray-50 last:border-b-0 bg-black">
-                                        <div className="relative w-full" style={{ maxHeight: '600px' }}>
-                                            <Image
-                                                src={url}
-                                                alt={`${post.title} - ${i + 1}`}
-                                                width={800}
-                                                height={600}
-                                                className="w-full h-auto object-contain"
-                                                style={{ maxHeight: '600px' }}
-                                            />
-                                        </div>
+                                    <div
+                                        key={i}
+                                        className="border-b border-gray-50 last:border-b-0 bg-black cursor-zoom-in"
+                                        onClick={() => setViewerIndex(i)}  // ✅ 클릭 시 뷰어 오픈
+                                    >
+                                        <Image
+                                            src={url}
+                                            alt={`${post.title} - ${i + 1}`}
+                                            width={800}
+                                            height={600}
+                                            className="w-full h-auto object-contain hover:opacity-95 transition-opacity"
+                                            style={{ maxHeight: '600px' }}
+                                        />
                                     </div>
                                 ))}
                             </div>
+                        )}
+                        
+                        {/* 이미지 뷰어 */}
+                        {viewerIndex !== null && (
+                            <ImageViewer
+                                images={post.images}
+                                initialIndex={viewerIndex}
+                                onClose={() => setViewerIndex(null)}
+                            />
                         )}
 
                         {/* 내용 */}
