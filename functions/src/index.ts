@@ -431,6 +431,61 @@ export const onPostCreated = onDocumentCreated(
     }
 );
 
+// 관리자가 카테고리 삭제 시 해당 카테고리 게시글도 모두 삭제 + 이미지 삭제
+export const adminDeleteCategory = onCall(fnOptions, async (request) => {
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+
+    const callerDoc = await db.collection("users").doc(request.auth.uid).get();
+    if (!callerDoc.exists || !callerDoc.data()?.isAdmin) {
+        throw new HttpsError("permission-denied", "관리자만 사용할 수 있습니다.");
+    }
+
+    const { categoryId, categoryName } = request.data;
+
+    // 해당 카테고리 게시글 조회
+    const postsSnap = await db
+        .collection("posts")
+        .where("category", "==", categoryName)
+        .get();
+
+    const batch = db.batch();
+    const storage = admin.storage().bucket();
+
+    // 각 게시글 삭제 + 이미지 삭제
+    for (const postDoc of postsSnap.docs) {
+        const postData = postDoc.data();
+
+        // Storage 이미지 삭제
+        if (postData.images && Array.isArray(postData.images)) {
+            for (const imgUrl of postData.images) {
+                try {
+                    // URL에서 파일 경로 추출
+                    const urlObj = new URL(imgUrl);
+                    const pathMatch = urlObj.pathname.match(/\/o\/(.+?)(\?|$)/);
+                    if (pathMatch) {
+                        const filePath = decodeURIComponent(pathMatch[1]);
+                        await storage.file(filePath).delete();
+                    }
+                } catch (err) {
+                    console.error("이미지 삭제 실패:", err);
+                }
+            }
+        }
+
+        // Firestore 게시글 삭제
+        batch.delete(postDoc.ref);
+    }
+
+    // 카테고리 문서 삭제
+    batch.delete(db.collection("categories").doc(categoryId));
+
+    await batch.commit();
+
+    return { success: true, deletedPosts: postsSnap.size };
+});
+
 export const onPostDeleted = onDocumentDeleted(
     { document: "posts/{postId}", region: "asia-northeast3" },
     async (event) => {

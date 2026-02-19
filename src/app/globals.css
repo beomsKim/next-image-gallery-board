@@ -1,4 +1,3 @@
-/* Pretendard 폰트 */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
 
 @tailwind base;
@@ -17,66 +16,56 @@
 
   body {
     font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-    @apply bg-slate-50 text-gray-900;
-    /* 모바일 하단 네비게이션 여백 */
+    @apply bg-gray-50 text-gray-900;
     padding-bottom: env(safe-area-inset-bottom);
-    word-break: keep-all;
-  }
-
-  /* 모바일 safe area */
-  .safe-bottom {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 }
 
 @layer components {
+
+  /* 버튼 */
   .btn-primary {
-    @apply bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 active:scale-95 transition-all duration-150 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed select-none touch-manipulation;
+    @apply bg-gray-900 text-white px-5 py-3 rounded-2xl font-semibold text-sm hover:bg-gray-800 active:scale-[0.98] transition-all duration-150 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed select-none touch-manipulation shadow-sm;
   }
 
   .btn-secondary {
-    @apply bg-gray-100 text-gray-700 px-4 py-2.5 rounded-xl font-semibold hover:bg-gray-200 active:scale-95 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed select-none touch-manipulation;
+    @apply bg-white text-gray-700 px-5 py-3 rounded-2xl font-semibold text-sm border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed select-none touch-manipulation;
   }
 
   .btn-ghost {
-    @apply text-gray-500 px-3 py-2 rounded-xl font-medium hover:bg-gray-100 active:bg-gray-200 transition-all duration-150 select-none touch-manipulation;
+    @apply text-gray-600 px-4 py-2.5 rounded-xl font-medium text-sm hover:bg-gray-100 active:bg-gray-200 transition-all duration-150 select-none touch-manipulation;
   }
 
+  /* 입력 필드 */
   .input-field {
-    @apply w-full px-4 py-3 border border-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 placeholder-gray-400 text-[16px] transition-all duration-150;
-    /* iOS zoom 방지 (16px 이상) */
-    font-size: 16px;
+    @apply w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl bg-white focus:outline-none focus:border-gray-900 focus:ring-0 text-gray-900 placeholder-gray-400 text-[16px] transition-all duration-200;
   }
 
+  /* 카드 */
   .card {
-    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-5;
+    @apply bg-white rounded-3xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow duration-200;
   }
 
-  /* 모바일 탭 스타일 */
+  /* 탭 */
   .tab-btn {
     @apply flex-1 py-3 text-sm font-semibold rounded-xl transition-all duration-200 select-none touch-manipulation active:scale-95;
   }
 
   .tab-btn-active {
-    @apply tab-btn bg-indigo-600 text-white shadow-sm;
+    @apply tab-btn bg-gray-900 text-white shadow-sm;
   }
 
   .tab-btn-inactive {
     @apply tab-btn text-gray-500 hover:text-gray-700 hover:bg-gray-100;
   }
 
-  /* 리스트 아이템 */
-  .list-item {
-    @apply flex items-center gap-3 p-4 rounded-2xl hover:bg-gray-50 active:bg-gray-100 transition-colors cursor-pointer;
-  }
-
   /* 뱃지 */
   .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold;
   }
 
   .badge-primary {
-    @apply badge bg-indigo-100 text-indigo-700;
+    @apply badge bg-gray-100 text-gray-800;
   }
 
   .badge-success {
@@ -102,17 +91,22 @@
     display: none;
   }
 
-  /* 터치 친화적 */
   .touch-target {
     @apply min-h-[44px] min-w-[44px] flex items-center justify-center;
   }
 
-  /* 텍스트 말줄임 */
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+  /* Pinterest 스타일 그림자 */
+  .shadow-pinterest {
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .shadow-pinterest-hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  /* 토스 스타일 그림자 */
+  .shadow-toss {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
   }
 }
 
@@ -120,7 +114,7 @@
 @keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(20px);
   }
 
   to {
@@ -142,7 +136,7 @@
 @keyframes scaleIn {
   from {
     opacity: 0;
-    transform: scale(0.95);
+    transform: scale(0.96);
   }
 
   to {
@@ -161,20 +155,34 @@
   }
 }
 
+@keyframes progress {
+  from {
+    width: 0%;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
 .animate-fadeUp {
-  animation: fadeUp 0.3s ease-out both;
+  animation: fadeUp 0.4s ease-out both;
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.2s ease-out both;
+  animation: fadeIn 0.3s ease-out both;
 }
 
 .animate-scaleIn {
-  animation: scaleIn 0.2s ease-out both;
+  animation: scaleIn 0.3s ease-out both;
 }
 
 .animate-slideUp {
-  animation: slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both;
+  animation: slideUp 0.35s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.animate-progress {
+  animation: progress 4s linear forwards;
 }
 
 /* 로딩 스피너 */
@@ -186,16 +194,6 @@
 
 .spinner {
   animation: spin 0.8s linear infinite;
-}
-
-/* 진행 바 애니메이션 */
-@keyframes progress {
-  from { width: 0%; }
-  to   { width: 100%; }
-}
-
-.animate-progress {
-  animation: progress 4s linear forwards;
 }
 
 /* 스켈레톤 */
@@ -210,7 +208,7 @@
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background: linear-gradient(90deg, #f5f5f5 25%, #e5e5e5 50%, #f5f5f5 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }

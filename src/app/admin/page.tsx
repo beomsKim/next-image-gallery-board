@@ -1,9 +1,19 @@
 'use client';
 
+import {
+    DndContext, closestCenter, KeyboardSensor, PointerSensor,
+    useSensor, useSensors, DragEndEvent
+} from '@dnd-kit/core';
+import {
+    arrayMove, SortableContext, sortableKeyboardCoordinates,
+    verticalListSortingStrategy, useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { useState, useEffect } from 'react';
 import {
     collection, query, getDocs, doc, updateDoc, setDoc,
-    deleteDoc, getDoc, where, orderBy, Timestamp, addDoc
+    deleteDoc, getDoc, where, orderBy, Timestamp, addDoc, writeBatch
 } from 'firebase/firestore';
 
 // @ts-ignore
@@ -12,7 +22,7 @@ import { useRouter } from "next/navigation";
 
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
-import { adminCreateUserFn, adminDeleteUserFn } from '@/lib/functions';
+import { adminCreateUserFn, adminDeleteUserFn, adminDeleteCategoryFn } from '@/lib/functions';
 import { useAdminCheck } from '@/hooks/useAdminCheck';
 import { Post } from '@/types/post';
 import { Category } from '@/types/category';
@@ -34,6 +44,13 @@ export default function AdminPage() {
     // @ts-ignore
 
     const { user, loading: authLoading } = useAdminCheck();
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     const [activeTab, setActiveTab] = useState<AdminTab>('users');
     const [loading, setLoading] = useState(false);
@@ -137,15 +154,15 @@ export default function AdminPage() {
     };
 
     const loadCategories = async () => {
-        const snap = await getDocs(query(collection(db, 'categories'), orderBy('name', 'asc')));
+        const snap = await getDocs(collection(db, 'categories'));
         const data = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Category[];
+
         data.sort((a, b) => {
-            if (a.isDefault && !b.isDefault) return -1;
-            if (!a.isDefault && b.isDefault) return 1;
-            if (a.isPinned && !b.isPinned) return -1;
-            if (!a.isPinned && b.isPinned) return 1;
-            return a.name.localeCompare(b.name, 'ko');
+            if (a.isDefault) return -1;
+            if (b.isDefault) return 1;
+            return (a.order ?? 999) - (b.order ?? 999);
         });
+
         setCategories(data);
     };
 
@@ -267,7 +284,7 @@ export default function AdminPage() {
         const snap = await getDocs(query(collection(db, 'notices'), orderBy('createdAt', 'desc')));
         setNotices(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     };
-
+    // 공지/이벤트 추가
     const handleAddNotice = async () => {
         if (!noticeTitle.trim() || !noticeContent.trim()) {
             setToast({ message: '제목과 내용을 입력해주세요.', type: 'error' });
@@ -289,13 +306,14 @@ export default function AdminPage() {
         setNoticeIsPinned(false);
         loadNotices();
     };
-
+    // 공지/이벤트 삭제
     const handleDeleteNotice = async (id: string) => {
         if (!confirm('삭제하시겠습니까?')) return;
         await deleteDoc(doc(db, 'notices', id));
         loadNotices();
     };
 
+    // 카테고리 추가 - order 필드 포함
     const handleAddCategory = async () => {
         if (!newCategoryName.trim()) return;
         const id = newCategoryName.trim().toLowerCase().replace(/\s+/g, '-');
@@ -305,14 +323,18 @@ export default function AdminPage() {
             return;
         }
         await setDoc(doc(db, 'categories', id), {
-            name: newCategoryName.trim(), isDefault: false,
-            isPinned: false, postCount: 0, createdAt: new Date(),
+            name: newCategoryName.trim(),
+            isDefault: false,
+            isPinned: false,
+            postCount: 0,
+            order: categories.length,
+            createdAt: new Date(),
         });
         setToast({ message: '카테고리가 추가되었습니다.', type: 'success' });
         setNewCategoryName('');
         loadCategories();
     };
-
+    // 카테고리 고정/해제
     const handleTogglePinCategory = async (cat: Category) => {
         const pinnedCount = categories.filter((c) => c.isPinned && !c.isDefault).length;
         if (!cat.isPinned && pinnedCount >= 3) {
@@ -323,46 +345,74 @@ export default function AdminPage() {
         loadCategories();
     };
 
+    // 카테고리 삭제 - 게시글 이동 또는 삭제 옵션
     const handleDeleteCategory = async () => {
         if (!categoryToDelete) return;
+
+        if (categoryToDelete.isDefault) {
+            setToast({ message: '기본 카테고리는 삭제할 수 없습니다.', type: 'error' });
+            return;
+        }
+
         setLoading(true);
         try {
-            const q = query(collection(db, 'posts'), where('category', '==', categoryToDelete.name));
-            const snap = await getDocs(q);
-            if (!snap.empty) {
-                if (deleteAction === 'delete') {
-                    await Promise.all(snap.docs.map(async (postDoc) => {
-                        const postData = postDoc.data();
-                        if (postData.images?.length) {
-                            await Promise.all(postData.images.map(async (url: string) => {
-                                try { await deleteObject(ref(storage, url)); } catch { }
-                            }));
-                        }
-                        await deleteDoc(postDoc.ref);
-                    }));
-                } else {
-                    await Promise.all(snap.docs.map((d) =>
-                        updateDoc(d.ref, { category: '전체', updatedAt: new Date() })
-                    ));
-                    const defaultRef = doc(db, 'categories', '전체');
-                    const defaultDoc = await getDoc(defaultRef);
-                    if (defaultDoc.exists()) {
-                        await updateDoc(defaultRef, { postCount: defaultDoc.data().postCount + snap.size });
-                    }
-                }
-            }
-            await deleteDoc(doc(db, 'categories', categoryToDelete.id));
-            setToast({ message: '카테고리가 삭제되었습니다.', type: 'success' });
+            const result = await adminDeleteCategoryFn({
+                categoryId: categoryToDelete.id,
+                categoryName: categoryToDelete.name,
+            });
+            const data = result.data as { deletedPosts: number };
+
+            setToast({
+                message: `카테고리와 ${data.deletedPosts}개 게시글이 삭제되었습니다.`,
+                type: 'success',
+            });
             setShowDeleteCategoryModal(false);
             setCategoryToDelete(null);
             loadCategories();
-        } catch {
-            setToast({ message: '카테고리 삭제에 실패했습니다.', type: 'error' });
+        } catch (err: any) {
+            setToast({ message: err.message || '삭제에 실패했습니다.', type: 'error' });
         } finally {
             setLoading(false);
         }
     };
 
+    // 카테고리 드래그 앤 드롭
+    const handleCategoryDragEnd = async (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = categories.findIndex((c) => c.id === active.id);
+        const newIndex = categories.findIndex((c) => c.id === over.id);
+        const reordered = arrayMove(categories, oldIndex, newIndex);
+
+        setCategories(reordered);
+
+        try {
+            const batch = writeBatch(db);
+
+            // 각 문서 존재 여부 확인 후 업데이트
+            for (let idx = 0; idx < reordered.length; idx++) {
+                const cat = reordered[idx];
+                const docRef = doc(db, 'categories', cat.id);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    batch.update(docRef, { order: idx });
+                } else {
+                    console.warn(`❌ 카테고리 문서 없음: ${cat.id}`);
+                }
+            }
+
+            await batch.commit();
+            setToast({ message: '순서가 변경되었습니다.', type: 'success' });
+        } catch (err) {
+            console.error('❌ 순서 변경 오류:', err);
+            setToast({ message: '순서 변경에 실패했습니다.', type: 'error' });
+            loadCategories();
+        }
+    };
+
+    // 게시글 고정/해제
     const handleTogglePinPost = async (post: Post) => {
         const pinnedCount = posts.filter((p) => p.isPinned).length;
         if (!post.isPinned && pinnedCount >= 3) {
@@ -373,6 +423,7 @@ export default function AdminPage() {
         loadPosts();
     };
 
+    // 게시글 삭제
     const handleDeletePost = async (post: Post) => {
         if (!confirm(`"${post.title}" 게시글을 삭제하시겠습니까?`)) return;
         try {
@@ -389,6 +440,7 @@ export default function AdminPage() {
         }
     };
 
+    // 필터 단어 추가
     const deleteWithdrawalRecord = async (id: string) => {
         await deleteDoc(doc(db, 'withdrawal_reasons', id));
         setToast({ message: '기록이 삭제되었습니다.', type: 'success' });
@@ -573,39 +625,45 @@ export default function AdminPage() {
                         {/* 카테고리 관리 */}
                         {activeTab === 'categories' && (
                             <div>
-                                <h2 className="text-lg font-bold mb-4">카테고리 관리</h2>
+                                <h2 className="text-lg font-bold mb-1">카테고리 관리</h2>
+                                <p className="text-xs text-gray-400 mb-4">드래그하여 순서를 변경할 수 있습니다</p>
+
                                 <div className="flex gap-2 mb-5">
-                                    <input type="text" value={newCategoryName}
+                                    <input
+                                        type="text"
+                                        value={newCategoryName}
                                         onChange={(e) => setNewCategoryName(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-                                        placeholder="새 카테고리 이름" className="input-field flex-1 text-sm" />
-                                    <button onClick={handleAddCategory} className="btn-primary shrink-0 text-sm">추가</button>
+                                        placeholder="새 카테고리 이름"
+                                        className="input-field flex-1 text-sm"
+                                    />
+                                    <button onClick={handleAddCategory} className="btn-primary shrink-0 text-sm">
+                                        추가
+                                    </button>
                                 </div>
-                                <div className="space-y-2">
-                                    {categories.map((cat) => (
-                                        <div key={cat.id}
-                                            className="flex items-center justify-between p-3.5 bg-gray-50 rounded-2xl gap-2">
-                                            <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                                <span className="font-semibold text-sm">{cat.name}</span>
-                                                {cat.isDefault && <span className="badge badge-primary">기본</span>}
-                                                {cat.isPinned && <span className="badge badge-warning">📌 고정</span>}
-                                                <span className="text-xs text-gray-400">({cat.postCount}개)</span>
-                                            </div>
-                                            {!cat.isDefault && (
-                                                <div className="flex gap-2 shrink-0">
-                                                    <button onClick={() => handleTogglePinCategory(cat)}
-                                                        className="text-xs text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded-lg hover:bg-amber-100 transition-colors font-medium">
-                                                        {cat.isPinned ? '고정 해제' : '고정'}
-                                                    </button>
-                                                    <button onClick={() => { setCategoryToDelete(cat); setShowDeleteCategoryModal(true); }}
-                                                        className="text-xs text-red-500 bg-red-50 px-2.5 py-1.5 rounded-lg hover:bg-red-100 transition-colors font-medium">
-                                                        삭제
-                                                    </button>
-                                                </div>
-                                            )}
+
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleCategoryDragEnd}
+                                    modifiers={[restrictToVerticalAxis]}
+                                >
+                                    <SortableContext
+                                        items={categories.map((c) => c.id)}
+                                        strategy={verticalListSortingStrategy}
+                                    >
+                                        <div className="space-y-2">
+                                            {categories.map((cat) => (
+                                                <SortableCategoryItem
+                                                    key={cat.id}
+                                                    category={cat}
+                                                    onTogglePin={() => handleTogglePinCategory(cat)}
+                                                    onDelete={() => { setCategoryToDelete(cat); setShowDeleteCategoryModal(true); }}
+                                                />
+                                            ))}
                                         </div>
-                                    ))}
-                                </div>
+                                    </SortableContext>
+                                </DndContext>
                             </div>
                         )}
 
@@ -878,11 +936,15 @@ export default function AdminPage() {
                                         {/* 모바일 카드형 */}
                                         <div className="block sm:hidden space-y-3">
                                             {reports.map((report) => (
-                                                <div key={report.id}
-                                                    className={`border rounded-2xl p-4
-                ${report.status === 'pending' ? 'border-red-200 bg-red-50' :
+                                                <div
+                                                    key={report.id}
+                                                    className={`
+                                                        border rounded-2xl p-4
+                                                        ${report.status === 'pending' ? 'border-red-200 bg-red-50' :
                                                             report.status === 'processing' ? 'border-amber-200 bg-amber-50' :
-                                                                'border-gray-100 bg-white'}`}>
+                                                                'border-gray-100 bg-white'}
+                                                    `}
+                                                >
 
                                                     {/* 상단: 제목 + 상태 */}
                                                     <div className="flex justify-between items-start mb-2 gap-2">
@@ -1184,5 +1246,80 @@ function StatusBadge({ status }: { status: string }) {
         <span className={`text-[10px] px-2 py-1 rounded-full font-bold whitespace-nowrap ${c.className}`}>
             {c.label}
         </span>
+    );
+}
+
+// admin/page.tsx 컴포넌트 바깥쪽에 추가
+function SortableCategoryItem({
+    category,
+    onTogglePin,
+    onDelete,
+}: {
+    category: any;
+    onTogglePin: () => void;
+    onDelete: () => void;
+}) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+        id: category.id,
+    });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className="flex items-center gap-3 p-4 bg-white rounded-2xl border border-gray-200
+                 hover:border-indigo-300 transition-all"
+        >
+            {/* 드래그 핸들 */}
+            {!category.isDefault && (
+                <button
+                    {...attributes}
+                    {...listeners}
+                    className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600
+                     w-6 h-6 flex items-center justify-center shrink-0"
+                >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <circle cx="4" cy="4" r="1.5" />
+                        <circle cx="4" cy="8" r="1.5" />
+                        <circle cx="4" cy="12" r="1.5" />
+                        <circle cx="12" cy="4" r="1.5" />
+                        <circle cx="12" cy="8" r="1.5" />
+                        <circle cx="12" cy="12" r="1.5" />
+                    </svg>
+                </button>
+            )}
+
+            <div className="flex items-center gap-2 flex-wrap flex-1 min-w-0">
+                <span className="font-semibold text-sm">{category.name}</span>
+                {category.isDefault && <span className="badge badge-primary">기본</span>}
+                {category.isPinned && <span className="badge badge-warning">📌 고정</span>}
+                <span className="text-xs text-gray-400">({category.postCount}개)</span>
+            </div>
+
+            {!category.isDefault && (
+                <div className="flex gap-2 shrink-0">
+                    <button
+                        onClick={onTogglePin}
+                        className="text-xs text-amber-600 bg-amber-50 px-2.5 py-1.5 rounded-lg
+                       hover:bg-amber-100 transition-colors font-medium"
+                    >
+                        {category.isPinned ? '고정 해제' : '고정'}
+                    </button>
+                    <button
+                        onClick={onDelete}
+                        className="text-xs text-red-500 bg-red-50 px-2.5 py-1.5 rounded-lg
+                       hover:bg-red-100 transition-colors font-medium"
+                    >
+                        삭제
+                    </button>
+                </div>
+            )}
+        </div>
     );
 }

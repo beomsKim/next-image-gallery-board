@@ -6,5 +6,6 @@ export interface Category {
     isDefault: boolean;
     isPinned: boolean;
     postCount: number;
+    order: number;
     createdAt: Timestamp | Date;
 }

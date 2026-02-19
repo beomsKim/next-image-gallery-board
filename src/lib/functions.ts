@@ -10,3 +10,4 @@ export const toggleLikeFn = httpsCallable(functions, 'toggleLike');
 export const addCommentFn = httpsCallable(functions, 'addComment');
 export const incrementViewFn = httpsCallable(functions, 'incrementView');
 export const checkRateLimitFn = httpsCallable(functions, 'checkRateLimit');
+export const adminDeleteCategoryFn = httpsCallable(functions, 'adminDeleteCategory');
