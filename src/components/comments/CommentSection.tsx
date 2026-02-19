@@ -88,10 +88,6 @@ export default function CommentSection({ postId }: CommentSectionProps) {
                 });
             } else {
                 await deleteDoc(doc(db, 'comments', comment.id));
-                //  댓글 수 감소
-                await updateDoc(doc(db, 'posts', postId), {
-                    commentCount: increment(-1),
-                });
             }
         } catch {
             setToast({ message: '삭제에 실패했습니다.', type: 'error' });

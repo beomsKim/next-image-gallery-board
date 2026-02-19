@@ -1,6 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 
 admin.initializeApp();
 
@@ -335,9 +335,6 @@ export const addComment = onCall(fnOptions, async (request) => {
                 // 원댓글 알림 실패해도 댓글 작성은 계속 진행
             }
         }
-        batch.update(db.collection('posts').doc(postId), {
-            commentCount: admin.firestore.FieldValue.increment(1),
-        });
 
         await batch.commit();
         return { success: true, commentId: commentRef.id };
@@ -411,3 +408,106 @@ export const checkRateLimit = onCall(fnOptions, async (request) => {
 
     return { allowed: true };
 });
+
+// 게시글 생성/삭제 시 카테고리 카운트 자동 업데이트
+export const onPostCreated = onDocumentCreated(
+    { document: "posts/{postId}", region: "asia-northeast3" },
+    async (event) => {
+        const postData = event.data?.data();
+        if (!postData) return;
+
+        const categoryName = postData.category || "전체";
+
+        // 카테고리 문서 찾기
+        const categoriesSnap = await db.collection("categories")
+            .where("name", "==", categoryName)
+            .get();
+
+        if (!categoriesSnap.empty) {
+            await categoriesSnap.docs[0].ref.update({
+                postCount: admin.firestore.FieldValue.increment(1),
+            });
+        }
+    }
+);
+
+export const onPostDeleted = onDocumentDeleted(
+    { document: "posts/{postId}", region: "asia-northeast3" },
+    async (event) => {
+        const postData = event.data?.data();
+        if (!postData) return;
+
+        const categoryName = postData.category || "전체";
+
+        const categoriesSnap = await db.collection("categories")
+            .where("name", "==", categoryName)
+            .get();
+
+        if (!categoriesSnap.empty) {
+            await categoriesSnap.docs[0].ref.update({
+                postCount: admin.firestore.FieldValue.increment(-1),
+            });
+        }
+    }
+);
+
+// 댓글 생성 시 게시글 commentCount 증가
+export const onCommentCreated = onDocumentCreated(
+    { document: "comments/{commentId}", region: "asia-northeast3" },
+    async (event) => {
+        const commentData = event.data?.data();
+        if (!commentData || commentData.isDeleted) return;
+
+        const postId = commentData.postId;
+        if (!postId) return;
+
+        await db.collection("posts").doc(postId).update({
+            commentCount: admin.firestore.FieldValue.increment(1),
+        });
+    }
+);
+
+// 댓글 삭제 시 게시글 commentCount 감소
+export const onCommentDeleted = onDocumentDeleted(
+    { document: "comments/{commentId}", region: "asia-northeast3" },
+    async (event) => {
+        const commentData = event.data?.data();
+        if (!commentData || commentData.isDeleted) return;
+
+        const postId = commentData.postId;
+        if (!postId) return;
+
+        await db.collection("posts").doc(postId).update({
+            commentCount: admin.firestore.FieldValue.increment(-1),
+        });
+    }
+);
+
+// 댓글 업데이트 시 (isDeleted 변경 감지)
+import { onDocumentUpdated } from "firebase-functions/v2/firestore";
+
+export const onCommentUpdated = onDocumentUpdated(
+    { document: "comments/{commentId}", region: "asia-northeast3" },
+    async (event) => {
+        const before = event.data?.before.data();
+        const after = event.data?.after.data();
+
+        if (!before || !after) return;
+
+        const postId = after.postId;
+        if (!postId) return;
+
+        // isDeleted가 false → true로 변경된 경우 (삭제됨)
+        if (!before.isDeleted && after.isDeleted) {
+            await db.collection("posts").doc(postId).update({
+                commentCount: admin.firestore.FieldValue.increment(-1),
+            });
+        }
+        // isDeleted가 true → false로 변경된 경우 (복구됨)
+        else if (before.isDeleted && !after.isDeleted) {
+            await db.collection("posts").doc(postId).update({
+                commentCount: admin.firestore.FieldValue.increment(1),
+            });
+        }
+    }
+);

@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-  doc, updateDoc, arrayUnion, arrayRemove, increment,
-  collection, query, where, onSnapshot
+  doc, updateDoc, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { toggleLikeFn } from '@/lib/functions';
@@ -34,20 +33,11 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [imgLoaded, setImgLoaded] = useState(false);
-    const [commentCount, setCommentCount] = useState(post.commentCount || 0);
 
     useEffect(() => {
         setLiked(user?.likedPosts?.includes(post.id) || false);
         setBookmarked(user?.bookmarkedPosts?.includes(post.id) || false);
-
-        if (post.commentCount !== undefined) return;
-        const unsubscribe = onSnapshot(
-            query(collection(db, 'comments'), where('postId', '==', post.id)),
-            (snap) => setCommentCount(snap.size)
-        );
-        return () => unsubscribe();
-
-    }, [user, post.id, post.commentCount]);
+    }, [user, post.id]);
 
     const handleCardClick = () => {
         if (!user) { setShowLoginModal(true); return; }
