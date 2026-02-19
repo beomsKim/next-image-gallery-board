@@ -8,6 +8,7 @@ import {
   collection, query, where, onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { toggleLikeFn } from '@/lib/functions';
 import { useAuth } from '@/hooks/useAuth';
 import { Post } from '@/types/post';
 import { formatRelativeTime, formatNumber } from '@/utils/format';

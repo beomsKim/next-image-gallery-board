@@ -5,6 +5,11 @@ import {
     collection, query, getDocs, doc, updateDoc, setDoc,
     deleteDoc, getDoc, where, orderBy, Timestamp, addDoc
 } from 'firebase/firestore';
+
+// @ts-ignore
+import { useRouter } from "next/navigation";
+// @ts-ignore
+
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { adminCreateUserFn, adminDeleteUserFn } from '@/lib/functions';
@@ -24,6 +29,10 @@ const getTime = (date: Date | Timestamp): number =>
     date instanceof Date ? date.getTime() : date.toDate().getTime();
 
 export default function AdminPage() {
+    // @ts-ignore
+    const router = useRouter();
+    // @ts-ignore
+
     const { user, loading: authLoading } = useAdminCheck();
 
     const [activeTab, setActiveTab] = useState<AdminTab>('users');
