@@ -95,12 +95,12 @@ export default function ReportButton({ postId, postTitle }: ReportButtonProps) {
                 <>
                     {/* 배경 */}
                     <div
-                        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+                        className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm"
                         onClick={handleClose}
                     />
 
                     {/* 모달 - 모바일: 하단 시트, 데스크톱: 중앙 */}
-                    <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-50
+                    <div className="fixed inset-x-0 bottom-0 sm:inset-0 z-[60]
                          flex items-end sm:items-center justify-center p-0 sm:p-4">
                         <div className="w-full sm:max-w-md bg-white
                            rounded-t-3xl sm:rounded-3xl shadow-2xl
@@ -174,7 +174,7 @@ export default function ReportButton({ postId, postTitle }: ReportButtonProps) {
             )}
 
             {toast && (
-                <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-[60]
+                <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-[70]
                        flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-lg
                        text-white text-sm font-medium max-w-[90vw] bg-emerald-500">
                     {toast.message}

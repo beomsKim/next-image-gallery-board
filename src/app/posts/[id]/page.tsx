@@ -71,28 +71,34 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
     };
 
     const handleLike = async () => {
-        if (!user) { setToast({ message: '로그인이 필요합니다.', type: 'error' }); return; }
+        if (!user) {
+            setToast({ message: '로그인이 필요합니다.', type: 'error' });
+            return;
+        }
 
         const newLiked = !liked;
         setLiked(newLiked);
         setLikeCount((p) => newLiked ? p + 1 : p - 1);
 
         try {
-            await toggleLikeFn({ postId });
+            const result = await toggleLikeFn({ postId });
+            const data = result.data as { liked: boolean };
+            setLiked(data.liked);
+
             // 로컬 user 상태도 업데이트
-            if (newLiked) {
+            if (data.liked) {
                 user.likedPosts = [...(user.likedPosts || []), postId];
             } else {
                 user.likedPosts = (user.likedPosts || []).filter((id) => id !== postId);
             }
-        } catch {
+        } catch (err: any) {
             // 실패 시 롤백
             setLiked(!newLiked);
             setLikeCount((p) => newLiked ? p - 1 : p + 1);
-            setToast({ message: '오류가 발생했습니다.', type: 'error' });
+            setToast({ message: err.message || '오류가 발생했습니다.', type: 'error' });
         }
     };
-
+    
     const handleBookmark = async () => {
         if (!user) { setToast({ message: '로그인이 필요합니다.', type: 'error' }); return; }
         const newBookmarked = !bookmarked;

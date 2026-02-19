@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-  doc, updateDoc, arrayUnion, arrayRemove
+    doc, updateDoc, arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { toggleLikeFn } from '@/lib/functions';
@@ -46,23 +46,29 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
 
     const handleLike = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!user) { setShowLoginModal(true); return; }
+        if (!user) {
+            setShowLoginModal(true);
+            return;
+        }
 
         const newLiked = !liked;
         setLiked(newLiked);
         setLikeCount((p) => newLiked ? p + 1 : p - 1);
 
         try {
-            await toggleLikeFn({ postId: post.id });
-            if (newLiked) {
+            const result = await toggleLikeFn({ postId: post.id });
+            const data = result.data as { liked: boolean };
+            setLiked(data.liked);
+
+            if (data.liked) {
                 user.likedPosts = [...(user.likedPosts || []), post.id];
             } else {
                 user.likedPosts = (user.likedPosts || []).filter((id) => id !== post.id);
             }
-        } catch {
+        } catch (err: any) {
             setLiked(!newLiked);
             setLikeCount((p) => newLiked ? p - 1 : p + 1);
-            setToast({ message: '오류가 발생했습니다.', type: 'error' });
+            setToast({ message: err.message || '오류가 발생했습니다.', type: 'error' });
         }
     };
 
