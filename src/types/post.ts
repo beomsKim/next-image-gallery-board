@@ -15,6 +15,7 @@ export interface Post {
     createdAt: Timestamp | Date;
     updatedAt: Timestamp | Date;
     editHistory?: { editedAt: Timestamp | Date }[];
+    commentCount?: number;
 }
 
 export interface PostFormData {

@@ -9,6 +9,7 @@ import {
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { useImageUpload } from '@/hooks/useImageUpload';
+import { checkRateLimitFn } from '@/lib/functions';
 import { getFilterWords, containsBadWord } from '@/utils/filterWords';
 import { validateTitle } from '@/utils/validation';
 import ImageUploader from './ImageUploader';
@@ -66,6 +67,15 @@ export default function PostForm({ postId, initialData }: PostFormProps) {
         if (content && containsBadWord(content, badWords)) {
             setToast({ message: '내용에 사용할 수 없는 단어가 포함되어 있습니다.', type: 'error' });
             return;
+        }
+
+        if (!postId) {
+            try {
+                await checkRateLimitFn({});
+            } catch (err: any) {
+                setToast({ message: err.message || '잠시 후 다시 시도해주세요.', type: 'error' });
+                return;
+            }
         }
 
         setSubmitting(true);

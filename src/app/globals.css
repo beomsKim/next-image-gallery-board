@@ -188,6 +188,16 @@
   animation: spin 0.8s linear infinite;
 }
 
+/* 진행 바 애니메이션 */
+@keyframes progress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+.animate-progress {
+  animation: progress 4s linear forwards;
+}
+
 /* 스켈레톤 */
 @keyframes shimmer {
   0% {

@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import {
     FiHome, FiPlusSquare, FiUser, FiSettings,
-    FiLogOut, FiMenu, FiX, FiImage
+    FiLogOut, FiMenu, FiX, FiImage, FiBell
 } from 'react-icons/fi';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import Modal from '@/components/common/Modal';
 
 export default function Header() {
@@ -59,6 +60,7 @@ export default function Header() {
                     <nav className="flex items-center gap-2">
                         {user ? (
                             <>
+                                <NotificationBell />
                                 <Link
                                     href="/posts/new"
                                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 active:scale-95 transition-all"
@@ -66,28 +68,42 @@ export default function Header() {
                                     <FiPlusSquare size={16} />
                                     글쓰기
                                 </Link>
-                                <Link href="/mypage"
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
-                              transition-all ${isActive('/mypage')
-                                            ? 'bg-indigo-50 text-indigo-600'
-                                            : 'text-gray-600 hover:bg-gray-100'}`}>
+                                <Link
+                                    href="/notices"
+                                    className={`
+                                        flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all
+                                        ${isActive('/notices') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-100'}
+                                    `}
+                                >
+                                    📢 공지
+                                </Link>
+                                <Link
+                                    href="/mypage"
+                                    className={
+                                        `flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all
+                                        ${isActive('/mypage') ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-100'}
+                                    `}
+                                >
                                     <FiUser size={16} />
                                     <span className="max-w-[80px] truncate">{user.nickname}</span>
                                 </Link>
                                 {user.isAdmin && (
-                                    <Link href="/admin"
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
-                                transition-all ${isActive('/admin')
-                                                ? 'bg-orange-50 text-orange-600'
-                                                : 'text-gray-500 hover:bg-gray-100'}`}>
+                                    <Link
+                                        href="/admin"
+                                        className={`
+                                            flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all
+                                            ${isActive('/admin') ? 'bg-orange-50 text-orange-600' : 'text-gray-500 hover:bg-gray-100'}
+                                        `}
+                                    >
                                         <FiSettings size={16} />
                                         관리자
                                         {user.isAdmin}
                                     </Link>
                                 )}
-                                <button onClick={() => setShowLogoutModal(true)}
-                                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium
-                             text-gray-500 hover:bg-gray-100 transition-all">
+                                <button
+                                    onClick={() => setShowLogoutModal(true)}
+                                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-100 transition-all"
+                                >
                                     <FiLogOut size={16} />
                                 </button>
                             </>
@@ -107,6 +123,7 @@ export default function Header() {
                 ${scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-white'}
             `}>
                 <div className="flex items-center justify-between px-4 h-14">
+                    <NotificationBell />
                     <Link href="/" className="flex items-center gap-2">
                         <div className="w-7 h-7 bg-indigo-600 rounded-lg flex items-center justify-center">
                             <FiImage size={14} className="text-white" />
@@ -136,6 +153,7 @@ export default function Header() {
                     <div className="flex items-center h-16 px-2">
                         {[
                             { href: '/', icon: FiHome, label: '홈' },
+                            { href: '/notices', icon: FiBell, label: '공지/이벤트' },
                             { href: '/posts/new', icon: FiPlusSquare, label: '글쓰기' },
                             { href: '/mypage', icon: FiUser, label: '마이페이지' },
                             ...(user.isAdmin ? [{ href: '/admin', icon: FiSettings, label: '관리자' }] : []),
@@ -189,6 +207,7 @@ export default function Header() {
                                     {/* 메뉴 아이템 */}
                                     {[
                                         { href: '/', icon: FiHome, label: '홈' },
+                                        { href: '/notices', icon: FiBell, label: '공지/이벤트' },
                                         { href: '/posts/new', icon: FiPlusSquare, label: '글쓰기' },
                                         { href: '/mypage', icon: FiUser, label: '마이페이지' },
                                         ...(user.isAdmin ? [{ href: '/admin', icon: FiSettings, label: '관리자 페이지' }] : []),

@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import GoogleAnalytics from '@/components/analytics/GoogleAnalytics';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import Header from '@/components/layout/Header';
+import NoticeBanner from '@/components/notices/NoticeBanner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -19,9 +21,14 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
+      <head>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+      </head>
       <body className={inter.className}>
+        <GoogleAnalytics />
         <AuthProvider>
           <div className="min-h-screen flex flex-col">
+            <NoticeBanner />
             <Header />
             <main className="flex-1">{children}</main>
           </div>

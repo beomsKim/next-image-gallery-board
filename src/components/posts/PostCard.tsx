@@ -3,13 +3,17 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { doc, updateDoc, arrayUnion, arrayRemove, increment } from 'firebase/firestore';
+import {
+  doc, updateDoc, arrayUnion, arrayRemove, increment,
+  collection, query, where, onSnapshot
+} from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Post } from '@/types/post';
 import { formatRelativeTime, formatNumber } from '@/utils/format';
 import { AiOutlineHeart, AiFillHeart, AiOutlineEye } from 'react-icons/ai';
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
+import { FiMessageCircle } from 'react-icons/fi';
 import Toast from '@/components/common/Toast';
 import Modal from '@/components/common/Modal';
 
@@ -29,11 +33,20 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [imgLoaded, setImgLoaded] = useState(false);
+    const [commentCount, setCommentCount] = useState(post.commentCount || 0);
 
     useEffect(() => {
         setLiked(user?.likedPosts?.includes(post.id) || false);
         setBookmarked(user?.bookmarkedPosts?.includes(post.id) || false);
-    }, [user, post.id]);
+
+        if (post.commentCount !== undefined) return;
+        const unsubscribe = onSnapshot(
+            query(collection(db, 'comments'), where('postId', '==', post.id)),
+            (snap) => setCommentCount(snap.size)
+        );
+        return () => unsubscribe();
+
+    }, [user, post.id, post.commentCount]);
 
     const handleCardClick = () => {
         if (!user) { setShowLoginModal(true); return; }
@@ -43,17 +56,16 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
     const handleLike = async (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!user) { setShowLoginModal(true); return; }
+
         const newLiked = !liked;
         setLiked(newLiked);
         setLikeCount((p) => newLiked ? p + 1 : p - 1);
+
         try {
+            await toggleLikeFn({ postId: post.id });
             if (newLiked) {
-                await updateDoc(doc(db, 'users', user.uid), { likedPosts: arrayUnion(post.id) });
-                await updateDoc(doc(db, 'posts', post.id), { likes: increment(1) });
                 user.likedPosts = [...(user.likedPosts || []), post.id];
             } else {
-                await updateDoc(doc(db, 'users', user.uid), { likedPosts: arrayRemove(post.id) });
-                await updateDoc(doc(db, 'posts', post.id), { likes: increment(-1) });
                 user.likedPosts = (user.likedPosts || []).filter((id) => id !== post.id);
             }
         } catch {
@@ -216,6 +228,12 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
                                 <AiOutlineHeart size={12} />
                                 {formatNumber(likeCount)}
                             </span>
+                            {(post.commentCount ?? 0) > 0 && (
+                                <span className="flex items-center gap-0.5">
+                                    <FiMessageCircle size={11} />
+                                    {formatNumber(post.commentCount || 0)}
+                                </span>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -12,10 +12,10 @@ import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
 import { Post } from '@/types/post';
 import { formatDateTime, formatNumber } from '@/utils/format';
-import { hasViewedPost, markPostAsViewed } from '@/utils/storage';
 import { AiOutlineHeart, AiFillHeart, AiOutlineEye } from 'react-icons/ai';
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
-import { FiEdit, FiTrash2 } from 'react-icons/fi';
+import CommentSection from '@/components/comments/CommentSection';
+import { incrementViewFn, toggleLikeFn } from '@/lib/functions';
 import ImageViewer from '@/components/common/ImageViewer';
 import ReportButton from '@/components/posts/ReportButton';
 import Loading from '@/components/common/Loading';
@@ -47,9 +47,8 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
     }, [user, postId, post]);
 
     useEffect(() => {
-        if (post && !hasViewedPost(postId)) {
-            updateDoc(doc(db, 'posts', postId), { views: increment(1) }).catch(console.error);
-            markPostAsViewed(postId);
+        if (post) {
+            incrementViewFn({ postId }).catch(console.error);
         }
     }, [post]);
 
@@ -73,20 +72,21 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
 
     const handleLike = async () => {
         if (!user) { setToast({ message: '로그인이 필요합니다.', type: 'error' }); return; }
+
         const newLiked = !liked;
         setLiked(newLiked);
         setLikeCount((p) => newLiked ? p + 1 : p - 1);
+
         try {
+            await toggleLikeFn({ postId });
+            // 로컬 user 상태도 업데이트
             if (newLiked) {
-                await updateDoc(doc(db, 'users', user.uid), { likedPosts: arrayUnion(postId) });
-                await updateDoc(doc(db, 'posts', postId), { likes: increment(1) });
                 user.likedPosts = [...(user.likedPosts || []), postId];
             } else {
-                await updateDoc(doc(db, 'users', user.uid), { likedPosts: arrayRemove(postId) });
-                await updateDoc(doc(db, 'posts', postId), { likes: increment(-1) });
                 user.likedPosts = (user.likedPosts || []).filter((id) => id !== postId);
             }
         } catch {
+            // 실패 시 롤백
             setLiked(!newLiked);
             setLikeCount((p) => newLiked ? p - 1 : p + 1);
             setToast({ message: '오류가 발생했습니다.', type: 'error' });
@@ -146,7 +146,7 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                     <div className="max-w-4xl mx-auto flex items-center gap-3">
                         <button onClick={() => router.back()}
                             className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100
-                       active:scale-95 transition-all text-gray-600">
+                                active:scale-95 transition-all text-gray-600">
                             ←
                         </button>
                         <div className="flex-1 min-w-0">
@@ -157,12 +157,12 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                             <div className="flex gap-1">
                                 <button onClick={() => router.push(`/posts/edit/${postId}`)}
                                     className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100
-                           active:scale-95 transition-all text-gray-600 text-sm">
+                                        active:scale-95 transition-all text-gray-600 text-sm">
                                     ✏️
                                 </button>
                                 <button onClick={() => setShowDeleteModal(true)}
                                     className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-red-50
-                           active:scale-95 transition-all text-red-500 text-sm">
+                                        active:scale-95 transition-all text-red-500 text-sm">
                                     🗑
                                 </button>
                             </div>
@@ -228,24 +228,18 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                         {post.images && post.images.length > 0 && (
                             <div className="border-t border-gray-50">
                                 {post.images.map((url, i) => (
-                                    <div
-                                        key={i}
+                                    <div key={i}
                                         className="border-b border-gray-50 last:border-b-0 bg-black cursor-zoom-in"
-                                        onClick={() => setViewerIndex(i)}  // ✅ 클릭 시 뷰어 오픈
-                                    >
-                                        <Image
-                                            src={url}
-                                            alt={`${post.title} - ${i + 1}`}
-                                            width={800}
-                                            height={600}
-                                            className="w-full h-auto object-contain hover:opacity-95 transition-opacity"
-                                            style={{ maxHeight: '600px' }}
-                                        />
+                                        onClick={() => setViewerIndex(i)}>
+                                        <Image src={url} alt={`${post.title} - ${i + 1}`}
+                                            width={800} height={600}
+                                            className="w-full h-auto object-contain hover:opacity-90 transition-opacity"
+                                            style={{ maxHeight: '600px' }} />
                                     </div>
                                 ))}
                             </div>
                         )}
-                        
+
                         {/* 이미지 뷰어 */}
                         {viewerIndex !== null && (
                             <ImageViewer
@@ -283,6 +277,9 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                                 {bookmarked ? '저장됨' : '저장'}
                             </button>
                         </div>
+
+                        {/* 댓글 */}
+                        <CommentSection postId={postId} />
                     </div>
 
                     <button onClick={() => router.push('/')}
