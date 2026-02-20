@@ -9,6 +9,7 @@ import {
 import { db } from '@/lib/firebase';
 import { toggleLikeFn } from '@/lib/functions';
 import { useAuth } from '@/hooks/useAuth';
+import { usePostLike } from '@/hooks/usePostLike';
 import { Post } from '@/types/post';
 import { formatRelativeTime, formatNumber } from '@/utils/format';
 import { AiOutlineHeart, AiFillHeart, AiOutlineEye } from 'react-icons/ai';
