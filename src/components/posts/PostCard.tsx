@@ -3,13 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import {
-    doc, updateDoc, arrayUnion, arrayRemove
-} from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { toggleLikeFn } from '@/lib/functions';
 import { useAuth } from '@/hooks/useAuth';
 import { usePostLike } from '@/hooks/usePostLike';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { Post } from '@/types/post';
 import { formatRelativeTime, formatNumber } from '@/utils/format';
 import { AiOutlineHeart, AiFillHeart, AiOutlineEye } from 'react-icons/ai';
@@ -28,15 +25,17 @@ interface PostCardProps {
 export default function PostCard({ post, showCheckbox, checked, onCheck }: PostCardProps) {
     const router = useRouter();
     const { user } = useAuth();
-    const [liked, setLiked] = useState(false);
     const [bookmarked, setBookmarked] = useState(false);
-    const [likeCount, setLikeCount] = useState(post.likes || 0);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [imgLoaded, setImgLoaded] = useState(false);
+    const { liked, likeCount, handleLike } = usePostLike(
+        post.id,
+        user?.likedPosts?.includes(post.id) || false,
+        post.likes
+    );
 
     useEffect(() => {
-        setLiked(user?.likedPosts?.includes(post.id) || false);
         setBookmarked(user?.bookmarkedPosts?.includes(post.id) || false);
     }, [user, post.id]);
 
@@ -45,34 +44,22 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
         router.push(`/posts/${post.id}`);
     };
 
-    const handleLike = async (e: React.MouseEvent) => {
+    // 좋아요 버튼 클릭 핸들러
+    const handleLikeClick = async (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!user) {
-            setShowLoginModal(true);
-            return;
-        }
 
-        const newLiked = !liked;
-        setLiked(newLiked);
-        setLikeCount((p) => newLiked ? p + 1 : p - 1);
+        const result = await handleLike();
 
-        try {
-            const result = await toggleLikeFn({ postId: post.id });
-            const data = result.data as { liked: boolean };
-            setLiked(data.liked);
-
-            if (data.liked) {
-                user.likedPosts = [...(user.likedPosts || []), post.id];
+        if (result.error) {
+            if (result.error === '로그인이 필요합니다.') {
+                setShowLoginModal(true);
             } else {
-                user.likedPosts = (user.likedPosts || []).filter((id) => id !== post.id);
+                setToast({ message: result.error, type: 'error' });
             }
-        } catch (err: any) {
-            setLiked(!newLiked);
-            setLikeCount((p) => newLiked ? p - 1 : p + 1);
-            setToast({ message: err.message || '오류가 발생했습니다.', type: 'error' });
         }
     };
 
+    // 북마크 버튼 클릭 핸들러
     const handleBookmark = async (e: React.MouseEvent) => {
         e.stopPropagation();
         if (!user) { setShowLoginModal(true); return; }
@@ -176,7 +163,7 @@ export default function PostCard({ post, showCheckbox, checked, onCheck }: PostC
                     <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-hover:opacity-100
                          transition-opacity duration-200 flex justify-between items-end
                          bg-gradient-to-t from-black/40 to-transparent">
-                        <button onClick={handleLike}
+                        <button onClick={handleLikeClick}
                             className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg
                          backdrop-blur-sm transition-all active:scale-90
                          ${liked ? 'bg-red-500 text-white' : 'bg-white/80 text-gray-700'}`}>

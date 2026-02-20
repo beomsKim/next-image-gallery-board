@@ -3,10 +3,9 @@
 import { use, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import {
-    doc, getDoc, updateDoc, deleteDoc,
-    increment, arrayUnion, arrayRemove
-} from 'firebase/firestore';
+import { incrementViewFn } from '@/lib/functions';
+import { usePostLike } from '@/hooks/usePostLike';
+import { doc, getDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/useAuth';
@@ -15,7 +14,6 @@ import { formatDateTime, formatNumber } from '@/utils/format';
 import { AiOutlineHeart, AiFillHeart, AiOutlineEye } from 'react-icons/ai';
 import { BsBookmark, BsBookmarkFill } from 'react-icons/bs';
 import CommentSection from '@/components/comments/CommentSection';
-import { incrementViewFn, toggleLikeFn } from '@/lib/functions';
 import ImageViewer from '@/components/common/ImageViewer';
 import ReportButton from '@/components/posts/ReportButton';
 import Loading from '@/components/common/Loading';
@@ -29,19 +27,22 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
 
     const [post, setPost] = useState<Post | null>(null);
     const [loading, setLoading] = useState(true);
-    const [liked, setLiked] = useState(false);
     const [bookmarked, setBookmarked] = useState(false);
-    const [likeCount, setLikeCount] = useState(0);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
+    const { liked, likeCount, handleLike } = usePostLike(
+        postId,
+        user?.likedPosts?.includes(postId) || false,
+        post?.likes || 0
+    );
+
     useEffect(() => { loadPost(); }, [postId]);
 
     useEffect(() => {
         if (user && post) {
-            setLiked(user.likedPosts?.includes(postId) || false);
             setBookmarked(user.bookmarkedPosts?.includes(postId) || false);
         }
     }, [user, postId, post]);
@@ -52,15 +53,17 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
         }
     }, [post]);
 
+    // 게시글 로드 함수
     const loadPost = async () => {
         try {
             const postDoc = await getDoc(doc(db, 'posts', postId));
-            if (!postDoc.exists()) { router.push('/'); return; }
+            if (!postDoc.exists()) {
+                router.push('/404');
+                return;
+            }
             const data = { id: postDoc.id, ...postDoc.data() } as Post;
             setPost(data);
-            setLikeCount(data.likes || 0);
             if (user) {
-                setLiked(user.likedPosts?.includes(postId) || false);
                 setBookmarked(user.bookmarkedPosts?.includes(postId) || false);
             }
         } catch (e) {
@@ -70,35 +73,16 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
         }
     };
 
-    const handleLike = async () => {
-        if (!user) {
-            setToast({ message: '로그인이 필요합니다.', type: 'error' });
-            return;
-        }
+    // 좋아요 버튼 클릭 핸들러
+    const handleLikeClick = async () => {
+        const result = await handleLike();
 
-        const newLiked = !liked;
-        setLiked(newLiked);
-        setLikeCount((p) => newLiked ? p + 1 : p - 1);
-
-        try {
-            const result = await toggleLikeFn({ postId });
-            const data = result.data as { liked: boolean };
-            setLiked(data.liked);
-
-            // 로컬 user 상태도 업데이트
-            if (data.liked) {
-                user.likedPosts = [...(user.likedPosts || []), postId];
-            } else {
-                user.likedPosts = (user.likedPosts || []).filter((id) => id !== postId);
-            }
-        } catch (err: any) {
-            // 실패 시 롤백
-            setLiked(!newLiked);
-            setLikeCount((p) => newLiked ? p - 1 : p + 1);
-            setToast({ message: err.message || '오류가 발생했습니다.', type: 'error' });
+        if (result.error) {
+            setToast({ message: result.error, type: 'error' });
         }
     };
-    
+
+    // 북마크 버튼 클릭 핸들러
     const handleBookmark = async () => {
         if (!user) { setToast({ message: '로그인이 필요합니다.', type: 'error' }); return; }
         const newBookmarked = !bookmarked;
@@ -119,6 +103,7 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
         }
     };
 
+    // 게시글 삭제 핸들러
     const handleDelete = async () => {
         try {
             setLoading(true);
@@ -264,7 +249,7 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
 
                         {/* 좋아요/북마크 */}
                         <div className="px-5 py-4 border-t border-gray-100 flex gap-3">
-                            <button onClick={handleLike}
+                            <button onClick={handleLikeClick}
                                 className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl
                          font-semibold text-sm transition-all active:scale-[0.97]
                          ${liked

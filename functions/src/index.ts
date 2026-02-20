@@ -1,6 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import { onDocumentCreated, onDocumentDeleted } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentDeleted, onDocumentUpdated } from "firebase-functions/v2/firestore";
 
 admin.initializeApp();
 
@@ -9,7 +9,7 @@ const auth = admin.auth();
 
 const fnOptions = {
     region: "asia-northeast3",
-    cors: true,  //  이게 핵심
+    cors: true,
 };
 
 // 관리자가 회원 생성
@@ -506,6 +506,47 @@ export const onPostDeleted = onDocumentDeleted(
     }
 );
 
+// 게시글 수정 시 카테고리 변경 감지
+export const onPostUpdated = onDocumentUpdated(
+    { document: "posts/{postId}", region: "asia-northeast3" },
+    async (event) => {
+        const before = event.data?.before.data();
+        const after = event.data?.after.data();
+
+        if (!before || !after) return;
+
+        const oldCategory = before.category || "전체";
+        const newCategory = after.category || "전체";
+
+        // 카테고리가 변경된 경우에만 처리
+        if (oldCategory !== newCategory) {
+            // 기존 카테고리 -1
+            const oldCategorySnap = await db
+                .collection("categories")
+                .where("name", "==", oldCategory)
+                .get();
+
+            if (!oldCategorySnap.empty) {
+                await oldCategorySnap.docs[0].ref.update({
+                    postCount: admin.firestore.FieldValue.increment(-1),
+                });
+            }
+
+            // 새 카테고리 +1
+            const newCategorySnap = await db
+                .collection("categories")
+                .where("name", "==", newCategory)
+                .get();
+
+            if (!newCategorySnap.empty) {
+                await newCategorySnap.docs[0].ref.update({
+                    postCount: admin.firestore.FieldValue.increment(1),
+                });
+            }
+        }
+    }
+);
+
 // 댓글 생성 시 게시글 commentCount 증가
 export const onCommentCreated = onDocumentCreated(
     { document: "comments/{commentId}", region: "asia-northeast3" },
@@ -539,8 +580,6 @@ export const onCommentDeleted = onDocumentDeleted(
 );
 
 // 댓글 업데이트 시 (isDeleted 변경 감지)
-import { onDocumentUpdated } from "firebase-functions/v2/firestore";
-
 export const onCommentUpdated = onDocumentUpdated(
     { document: "comments/{commentId}", region: "asia-northeast3" },
     async (event) => {
